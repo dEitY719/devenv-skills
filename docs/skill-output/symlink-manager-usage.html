@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ko" class="theme-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>symlink-manager 실행 기록</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { interpolate-size: allow-keywords; }
+
+    /* ===== THEMES (class-based ONLY) ===== */
+    html.theme-dark {
+      --bg: #0A0A0A; --surface: #141414; --surface-hover: #1C1C1C;
+      --border: rgba(255,255,255,0.08);
+      --text: #EDEDED; --text-secondary: #8A8A8A;
+      --accent: #3b82f6; --accent-secondary: #8b5cf6;
+      --positive: #10b981; --negative: #f43f5e; --warning: #f59e0b;
+      --code-bg: #0F0F0F;
+    }
+    html.theme-light {
+      --bg: #FAFAF9; --surface: #FFFFFF; --surface-hover: #F5F5F4;
+      --border: rgba(0,0,0,0.09);
+      --text: #0f172a; --text-secondary: #57616f;
+      --accent: #2563eb; --accent-secondary: #7c3aed;
+      --positive: #059669; --negative: #e11d48; --warning: #b45309;
+      --code-bg: #F4F4F2;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg); color: var(--text);
+      font-size: 1rem; line-height: 1.7; -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.01em;
+      transition: background 0.3s, color 0.3s;
+      scrollbar-gutter: stable;
+      overflow-x: hidden;
+    }
+    h1,h2,h3,h4 { color: var(--text); letter-spacing: -0.03em; line-height: 1.15; text-wrap: balance; }
+    h1 { font-size: clamp(3rem, 8vw, 4.5rem); font-weight: 800; }
+    h2 { font-size: clamp(2rem, 5vw, 2.6rem); font-weight: 700; }
+    h3 { font-size: clamp(1.5rem, 3.6vw, 1.75rem); font-weight: 600; }
+    h4 { font-size: 1.125rem; font-weight: 600; }
+    p, li, td, th, span, label { color: var(--text); font-weight: 400; }
+    .text-secondary { color: var(--text-secondary); }
+
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+    section { padding: 56px 0; border-top: 1px solid var(--border); }
+    section:first-of-type { border-top: none; }
+
+    .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+    /* ===== HEADER ===== */
+    .page-head { padding: 88px 0 48px; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.8125rem;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--accent); border: 1px solid var(--border);
+      background: var(--surface); border-radius: 999px; padding: 6px 14px;
+      margin-bottom: 22px;
+    }
+    .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--positive); }
+    .page-head h1 span { color: var(--accent); }
+    .lede { font-size: 1.125rem; color: var(--text-secondary); max-width: 60ch; margin-top: 18px; }
+
+    /* ===== CARD ===== */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 24px;
+      transition: box-shadow 0.2s ease, transform 0.2s ease, background 0.3s;
+    }
+    .card:hover { box-shadow: 0 0 0 1px var(--border), 0 10px 22px rgba(0,0,0,0.14); transform: translateY(-2px); }
+
+    /* ===== CALLOUT ===== */
+    .callout {
+      display: flex; gap: 18px; align-items: flex-start;
+      background: var(--surface); border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: 12px; padding: 22px 24px;
+    }
+    .callout .tag {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+      letter-spacing: 0.08em; color: var(--accent); white-space: nowrap;
+      padding-top: 4px; font-weight: 700;
+    }
+    .callout p { font-size: 1.0625rem; }
+
+    .callout.sandbox { border-left-color: var(--warning); }
+    .callout.sandbox .tag { color: var(--warning); }
+
+    /* ===== PIPELINE FLOW ===== */
+    .flow {
+      display: flex; align-items: stretch; gap: 12px; flex-wrap: wrap;
+      margin-top: 28px;
+    }
+    .flow-node {
+      flex: 1 1 200px; min-width: 0;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px 18px; text-align: center;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .flow-node:hover { border-color: var(--accent); transform: translateY(-3px); }
+    .flow-node .icon { font-size: 1.5rem; line-height: 1; display: block; margin-bottom: 10px; }
+    .flow-node .label { display: block; font-weight: 600; font-size: 1rem; word-break: keep-all; }
+    .flow-node .sub {
+      display: block; margin-top: 6px; font-size: 0.8125rem; color: var(--text-secondary);
+      font-family: 'JetBrains Mono', monospace; overflow-wrap: anywhere;
+    }
+    .flow-node.skill { border-color: var(--accent); background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 10%, var(--surface)), var(--surface)); }
+    .flow-node.out { border-color: var(--positive); }
+    .flow-arrow {
+      flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+      color: var(--accent); font-size: 1.375rem; font-weight: 700; padding: 0 2px;
+    }
+    .flow-out-list { list-style: none; margin-top: 10px; display: grid; gap: 4px; }
+    .flow-out-list li { font-size: 0.8125rem; color: var(--text-secondary); }
+    @media (max-width: 720px) {
+      .flow { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); padding: 2px 0; }
+    }
+
+    /* ===== CODE BLOCK ===== */
+    .code {
+      position: relative; background: var(--code-bg);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 18px 18px; margin-top: 16px;
+    }
+    .code pre {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 0.875rem; line-height: 1.9;
+      overflow-x: auto; color: var(--text);
+      padding-right: 84px;
+    }
+    .code .cmt { color: var(--text-secondary); }
+    .code .tok { color: var(--accent); }
+    .copy-btn {
+      position: absolute; top: 12px; right: 12px;
+      background: var(--surface); color: var(--text-secondary);
+      border: 1px solid var(--border); border-radius: 7px;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+      padding: 5px 10px; cursor: pointer; transition: all 0.15s;
+    }
+    .copy-btn:hover { background: var(--surface-hover); color: var(--text); border-color: var(--accent); }
+    .copy-btn.done { color: var(--positive); border-color: var(--positive); }
+
+    /* ===== VERDICT BAR ===== */
+    .verdict {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px;
+      background: var(--surface);
+      border: 1px solid color-mix(in srgb, var(--positive) 45%, var(--border));
+      border-left: 5px solid var(--positive);
+      border-radius: 12px; padding: 20px 22px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--positive) 12%, transparent);
+      overflow-x: auto;
+    }
+    .verdict .ok {
+      color: var(--positive); font-weight: 700; font-size: 1.125rem; white-space: nowrap;
+    }
+    .verdict .name { font-weight: 600; font-size: 1rem; white-space: nowrap; }
+    .verdict .kv { font-size: 0.875rem; color: var(--text-secondary); white-space: nowrap; }
+    .verdict .kv b { color: var(--text); font-weight: 600; }
+    .verdict .kv.sha b { color: var(--accent); }
+
+    /* ===== STATS ===== */
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-top: 24px; }
+    .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+    .stat .num { font-family: 'JetBrains Mono', monospace; font-size: 2.25rem; font-weight: 700; line-height: 1; color: var(--accent); }
+    .stat .num.pos { color: var(--positive); }
+    .stat .cap { display: block; margin-top: 8px; font-size: 0.875rem; color: var(--text-secondary); word-break: keep-all; }
+
+    /* ===== TIMELINE ===== */
+    .timeline { list-style: none; margin-top: 28px; position: relative; padding-left: 34px; }
+    .timeline::before {
+      content: ''; position: absolute; left: 11px; top: 10px; bottom: 10px;
+      width: 2px; background: var(--border);
+    }
+    .timeline > li { position: relative; padding-bottom: 24px; }
+    .timeline > li:last-child { padding-bottom: 0; }
+    .timeline > li::before {
+      content: ''; position: absolute; left: -30px; top: 8px;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--positive); border: 3px solid var(--bg);
+      box-shadow: 0 0 0 2px var(--positive);
+    }
+    .phase-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+    .phase-tag {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 700;
+      letter-spacing: 0.05em; color: var(--positive);
+      border: 1px solid color-mix(in srgb, var(--positive) 40%, var(--border));
+      border-radius: 999px; padding: 3px 10px; white-space: nowrap;
+    }
+    .phase-title { font-size: 1.0625rem; font-weight: 600; }
+    .phase-body { margin-top: 8px; color: var(--text-secondary); font-size: 0.9375rem; }
+    .phase-body code, .inline-code {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.875em;
+      background: var(--code-bg); border: 1px solid var(--border);
+      border-radius: 5px; padding: 1px 6px; color: var(--text);
+      overflow-wrap: anywhere;
+    }
+
+    /* ===== BEFORE/AFTER LOCATION DIAGRAM ===== */
+    .ba-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+    .ba-toggle { display: inline-flex; background: var(--code-bg); border: 1px solid var(--border); border-radius: 999px; padding: 4px; gap: 4px; }
+    .ba-toggle button {
+      font-family: inherit; font-size: 0.875rem; font-weight: 600;
+      border: none; background: transparent; color: var(--text-secondary);
+      padding: 7px 16px; border-radius: 999px; cursor: pointer; transition: all 0.2s;
+    }
+    .ba-toggle button:hover { color: var(--text); }
+    .ba-toggle button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+    .ba-stage { margin-top: 20px; }
+    .ba-panel { display: none; }
+    .ba-panel.active { display: block; animation: fadeIn 0.35s ease-out both; }
+    .ba-row { display: flex; align-items: stretch; gap: 12px; flex-wrap: wrap; }
+    .ba-box {
+      flex: 1 1 260px; min-width: 0;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px 18px;
+    }
+    .ba-box .role { font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); }
+    .ba-box .path { display: block; margin-top: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.875rem; overflow-wrap: anywhere; }
+    .ba-box.real { border-color: var(--positive); }
+    .ba-box.link { border-color: var(--accent); border-style: dashed; }
+    .ba-box .badge { display: inline-block; margin-top: 10px; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; padding: 2px 8px; border-radius: 999px; }
+    .ba-box.real .badge { color: var(--positive); border: 1px solid color-mix(in srgb, var(--positive) 40%, var(--border)); }
+    .ba-box.link .badge { color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border)); }
+    .ba-link-arrow { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; color: var(--accent); font-family: 'JetBrains Mono', monospace; font-size: 0.875rem; }
+    @media (max-width: 720px) { .ba-link-arrow { transform: rotate(90deg); } }
+    .ba-note { margin-top: 14px; font-size: 0.9375rem; color: var(--text-secondary); }
+
+    /* ===== FILE PREVIEW ===== */
+    .file-card { margin-top: 20px; }
+    .file-bar {
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.8125rem;
+      color: var(--text-secondary); padding-bottom: 12px; border-bottom: 1px solid var(--border);
+    }
+    .file-bar .fname { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
+    .opts { list-style: none; margin-top: 14px; display: grid; gap: 8px; }
+    .opts li { font-family: 'JetBrains Mono', monospace; font-size: 0.875rem; display: flex; gap: 10px; align-items: baseline; }
+    .opts li .n { color: var(--text-secondary); font-size: 0.75rem; min-width: 1.4em; }
+
+    .kv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 22px; }
+
+    footer { border-top: 1px solid var(--border); padding: 32px 0 56px; color: var(--text-secondary); font-size: 0.875rem; }
+
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .animate { animation: fadeInUp 0.6s ease-out both; }
+    .animate.delay-1 { animation-delay: 0.1s; }
+    .animate.delay-2 { animation-delay: 0.2s; }
+    .animate.delay-3 { animation-delay: 0.3s; }
+    .animate.delay-4 { animation-delay: 0.4s; }
+    .animate.delay-5 { animation-delay: 0.5s; }
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      html { scroll-behavior: auto; }
+      .reveal { opacity: 1; transform: none; }
+    }
+
+    /* ===== PRINT ===== */
+    @media print {
+      body { background: white !important; color: black !important; }
+      .viz-menu, .copy-btn, .ba-toggle { display: none !important; }
+      .reveal { display: revert; opacity: 1 !important; transform: none !important; }
+      .card, .callout, .verdict, .stat, .flow-node, .ba-box { break-inside: avoid; border: 1px solid #ddd; box-shadow: none; }
+      .ba-panel { display: block !important; }
+      section { border-top: 1px solid #ddd; padding: 24px 0; }
+      * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+    @page { margin: 1in; }
+
+    /* ===== MENU ===== */
+    .viz-menu { position: fixed; top: 16px; right: 16px; z-index: 9999; }
+    .viz-menu-toggle {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); cursor: pointer; display: flex;
+      align-items: center; justify-content: center;
+      backdrop-filter: blur(12px); transition: all 0.2s;
+    }
+    .viz-menu-toggle:hover { background: var(--surface-hover); }
+    .viz-menu-dropdown {
+      position: absolute; top: 52px; right: 0; min-width: 200px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 8px;
+      opacity: 0; visibility: hidden; transform: translateY(-8px);
+      transition: all 0.2s; backdrop-filter: blur(16px);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.24);
+    }
+    .viz-menu-dropdown.open { opacity: 1; visibility: visible; transform: translateY(0); }
+    .viz-menu-dropdown button {
+      width: 100%; padding: 10px 14px; border: none; border-radius: 8px;
+      background: transparent; color: var(--text); font-size: 14px;
+      font-family: inherit; cursor: pointer; text-align: left;
+      display: flex; align-items: center; gap: 10px; transition: background 0.15s;
+    }
+    .viz-menu-dropdown button:hover { background: var(--surface-hover); }
+
+    /* ===== SKIP TO CONTENT ===== */
+    .skip-to-content {
+      position: absolute; top: -40px; left: 6px; background: var(--accent);
+      color: white; padding: 8px 12px; text-decoration: none;
+      border-radius: 4px; opacity: 0; pointer-events: none;
+      transition: all 0.2s; z-index: 10000;
+    }
+    .skip-to-content:focus { top: 6px; opacity: 1; pointer-events: auto; }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-to-content">본문으로 건너뛰기</a>
+
+  <!-- MENU -->
+  <div class="viz-menu">
+    <button class="viz-menu-toggle" onclick="toggleMenu()" aria-label="메뉴 열기" aria-haspopup="true">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="15" x2="17" y2="15"/>
+      </svg>
+    </button>
+    <div class="viz-menu-dropdown" id="vizMenuDropdown">
+      <button onclick="cycleTheme()" aria-label="테마 전환"><span id="themeIcon" style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span><span id="themeLabel">Dark</span></button>
+      <button onclick="downloadImage()" aria-label="PNG 내려받기"><span style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span><span>Download PNG</span></button>
+      <button onclick="window.print()" aria-label="인쇄 또는 PDF 저장"><span style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></span><span>Print / PDF</span></button>
+    </div>
+  </div>
+
+  <main id="main-content" role="main">
+
+    <!-- HEADER -->
+    <header class="page-head">
+      <div class="wrap">
+        <span class="eyebrow animate"><span class="dot"></span>실행 기록 · devenv</span>
+        <h1 class="animate delay-1"><span>symlink-manager</span><br>사용 결과</h1>
+        <p class="lede animate delay-2">
+          설정 파일 하나(<span class="inline-code">ripgreprc</span>)를 dotfiles 로 옮기고 원위치에 심볼릭 링크를 걸기까지,
+          한 번의 실제 실행을 그대로 기록한 문서입니다.
+        </p>
+      </div>
+    </header>
+
+    <!-- 한 줄 요약 + 파이프라인 -->
+    <section aria-labelledby="h-summary">
+      <div class="wrap">
+        <h2 id="h-summary" data-reveal>한 줄 요약</h2>
+        <div class="callout" style="margin-top:20px" data-reveal>
+          <span class="tag">TL;DR</span>
+          <p>설정 파일 하나를 받아 <b>dotfiles 정본</b> + <b>원위치 심볼릭 링크</b> + <b>관리 함수</b> + <b>커밋</b>을 생성합니다.</p>
+        </div>
+
+        <div class="flow" data-reveal role="img" aria-label="파이프라인: 설정 파일에서 스킬을 거쳐 dotfiles 정본, 심볼릭 링크, 커밋으로">
+          <div class="flow-node">
+            <span class="icon" style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+            <span class="label">설정 파일</span>
+            <span class="sub">ripgreprc</span>
+          </div>
+          <div class="flow-arrow" aria-hidden="true">──▶</div>
+          <div class="flow-node skill">
+            <span class="icon" style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
+            <span class="label">/devenv:symlink-manager</span>
+            <span class="sub">Phase 1 → 5</span>
+          </div>
+          <div class="flow-arrow" aria-hidden="true">──▶</div>
+          <div class="flow-node out">
+            <span class="icon" aria-hidden="true">✅</span>
+            <span class="label">결과물</span>
+            <ul class="flow-out-list">
+              <li>dotfiles 정본</li>
+              <li>심볼릭 링크</li>
+              <li>커밋</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 1. 실행한 명령 -->
+    <section aria-labelledby="h-cmd">
+      <div class="wrap">
+        <h2 id="h-cmd" data-reveal>1. 실행한 명령</h2>
+
+        <div class="code" data-reveal>
+          <button class="copy-btn" type="button" onclick="copyCode(this)" aria-label="명령 복사">복사</button>
+          <pre id="code-cmd"><span class="tok">/devenv:symlink-manager</span> &lt;file&gt;                        <span class="cmt"># 범용 형식</span>
+<span class="tok">/devenv:symlink-manager</span> $SANDBOX/home/.config/ripgrep/ripgreprc   <span class="cmt"># 이번 실행</span></pre>
+        </div>
+
+        <div class="callout sandbox" style="margin-top:22px" data-reveal>
+          <span class="tag">SANDBOX</span>
+          <div>
+            <p><span class="inline-code">SANDBOX=/tmp/claude-1000/.../scratchpad/symlink-sandbox</span></p>
+            <p style="margin-top:8px">
+              이 스킬은 <b>원본을 이동시키고 <span class="inline-code">git commit</span> 까지</b> 하므로,
+              실제 <span class="inline-code">~/dotfiles</span> 가 아니라
+              <span class="inline-code">bash/{claude,app,config,env}/</span> 로 배치한
+              <b>샌드박스 dotfiles 레포</b>에서 실행했다.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. 입력 -->
+    <section aria-labelledby="h-input">
+      <div class="wrap">
+        <h2 id="h-input" data-reveal>2. 입력</h2>
+
+        <div class="card file-card" data-reveal>
+          <div class="file-bar">
+            <span class="fname">$SANDBOX/home/.config/ripgrep/ripgreprc</span>
+            <span>4 lines · ripgrep 설정</span>
+          </div>
+          <ul class="opts">
+            <li><span class="n">1</span><span>--smart-case</span></li>
+            <li><span class="n">2</span><span>--hidden</span></li>
+            <li><span class="n">3</span><span>--glob=!.git/*</span></li>
+            <li><span class="n">4</span><span>--max-columns=200</span></li>
+          </ul>
+        </div>
+
+        <div class="kv-grid">
+          <div class="card" data-reveal>
+            <h4>분류 판단</h4>
+            <p class="text-secondary" style="margin-top:6px">일반 설정이므로 카테고리는 <span class="inline-code">bash/config/</span> 로 결정됐다.</p>
+          </div>
+          <div class="card" data-reveal>
+            <h4>대상 파일</h4>
+            <p class="text-secondary" style="margin-top:6px">4줄짜리 ripgrep 설정 파일 <span class="inline-code">ripgreprc</span> 한 개.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. 결과 -->
+    <section aria-labelledby="h-result">
+      <div class="wrap">
+        <h2 id="h-result" data-reveal>3. 결과</h2>
+
+        <div class="verdict" style="margin-top:22px" data-reveal role="status" aria-label="실행 결과: OK">
+          <span class="ok">[OK]</span>
+          <span class="name">devenv:symlink-manager</span>
+          <span class="kv">target=<b>ripgreprc</b></span>
+          <span class="kv">category=<b>config</b></span>
+          <span class="kv">links=<b>1</b></span>
+          <span class="kv sha">commit=<b>9c12954</b></span>
+        </div>
+
+        <div class="stats" data-reveal>
+          <div class="stat">
+            <div class="num pos" data-count="1">1</div>
+            <span class="cap">생성된 심볼릭 링크</span>
+          </div>
+          <div class="stat">
+            <div class="num" data-count="2">2</div>
+            <span class="cap">files changed</span>
+          </div>
+          <div class="stat">
+            <div class="num" data-count="18">18</div>
+            <span class="cap">insertions</span>
+          </div>
+          <div class="stat">
+            <div class="num" data-count="2">2</div>
+            <span class="cap">검출된 관리 함수</span>
+          </div>
+        </div>
+
+        <h3 style="margin-top:48px" data-reveal>Phase 별 결과</h3>
+        <ol class="timeline" data-reveal>
+          <li>
+            <div class="phase-head">
+              <span class="phase-tag">PHASE 1</span>
+              <span class="phase-title">백업 → 이동 → 링크 → 검증</span>
+            </div>
+            <p class="phase-body">
+              <code>ripgreprc.backup</code> 생성 후 원본을 <code>bash/config/ripgreprc</code> 로 옮기고
+              원위치에 심볼릭 링크 생성. 링크를 통해 읽은 내용이 백업과 <code>diff</code> 상 동일함을 확인했다.
+            </p>
+          </li>
+          <li>
+            <div class="phase-head">
+              <span class="phase-tag">PHASE 2/3</span>
+              <span class="phase-title">관리 함수 + help 추가</span>
+            </div>
+            <p class="phase-body">
+              <code>bash/app/ripgrep.bash</code> 에 <code>ripgrep_init</code>, <code>ripgrep_edit_config</code> 를 추가하고
+              <code>ripgrephelp</code> 에 설명을 넣었다 (<code>bash -n</code> 문법 검사 통과).
+            </p>
+          </li>
+          <li>
+            <div class="phase-head">
+              <span class="phase-tag">PHASE 4</span>
+              <span class="phase-title">커밋</span>
+            </div>
+            <p class="phase-body">
+              커밋 <code>9c12954 feat: manage ripgreprc via dotfiles with symbolic link</code>,
+              2 files changed / 18 insertions.
+            </p>
+          </li>
+          <li>
+            <div class="phase-head">
+              <span class="phase-tag">PHASE 5</span>
+              <span class="phase-title">최종 검증</span>
+            </div>
+            <p class="phase-body">
+              link / source / backup 존재 확인, 관리 함수 2개 검출.
+            </p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- 파일 위치 before/after -->
+    <section aria-labelledby="h-where">
+      <div class="wrap">
+        <div class="ba-head">
+          <h3 id="h-where" data-reveal>파일은 어디로 갔나</h3>
+          <div class="ba-toggle" role="group" aria-label="실행 전후 보기 전환">
+            <button type="button" id="baBtnBefore" aria-pressed="true" onclick="showBA('before')">실행 전</button>
+            <button type="button" id="baBtnAfter" aria-pressed="false" onclick="showBA('after')">실행 후</button>
+          </div>
+        </div>
+
+        <div class="ba-stage" data-reveal>
+          <div class="ba-panel active" id="baBefore">
+            <div class="ba-row">
+              <div class="ba-box real">
+                <span class="role">원위치 · 실제 파일</span>
+                <span class="path">$SANDBOX/home/.config/ripgrep/ripgreprc</span>
+                <span class="badge">regular file</span>
+              </div>
+            </div>
+            <p class="ba-note">dotfiles 레포에는 아무것도 없고, 설정은 홈 디렉터리에만 존재한다.</p>
+          </div>
+
+          <div class="ba-panel" id="baAfter">
+            <div class="ba-row">
+              <div class="ba-box link">
+                <span class="role">원위치 · 심볼릭 링크</span>
+                <span class="path">$SANDBOX/home/.config/ripgrep/ripgreprc</span>
+                <span class="badge">symlink</span>
+              </div>
+              <div class="ba-link-arrow" aria-hidden="true">──▶</div>
+              <div class="ba-box real">
+                <span class="role">dotfiles · 정본</span>
+                <span class="path">bash/config/ripgreprc</span>
+                <span class="badge">source of truth</span>
+              </div>
+            </div>
+            <p class="ba-note">
+              원위치 경로는 그대로 유지되므로 ripgrep 은 변화를 눈치채지 못한다.
+              내용은 dotfiles 안의 정본 한 곳에서만 관리되고, 백업 <span class="inline-code">ripgreprc.backup</span> 이 남는다.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="wrap">
+        <p>출처: <span class="inline-code">docs/skill-output/symlink-manager-usage.md</span> · devenv 플러그인 실행 기록 (샌드박스 dotfiles 레포)</p>
+      </div>
+    </footer>
+
+  </main>
+
+  <script>
+    var vizMoonIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+    var vizSunIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>';
+
+    // === Menu ===
+    function toggleMenu() {
+      var dropdown = document.getElementById('vizMenuDropdown');
+      if (dropdown) dropdown.classList.toggle('open');
+    }
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.viz-menu')) {
+        var dropdown = document.getElementById('vizMenuDropdown');
+        if (dropdown) dropdown.classList.remove('open');
+      }
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        var dropdown = document.getElementById('vizMenuDropdown');
+        if (dropdown) dropdown.classList.remove('open');
+      }
+    });
+
+    // === Theme (class-based) ===
+    var savedTheme = localStorage.getItem('viz-theme');
+    var currentTheme = savedTheme || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    function applyTheme(t) {
+      document.documentElement.className = 'theme-' + t;
+      document.getElementById('themeIcon').innerHTML = t === 'dark' ? vizMoonIcon : vizSunIcon;
+      document.getElementById('themeLabel').textContent = t === 'dark' ? 'Dark' : 'Light';
+      localStorage.setItem('viz-theme', t);
+      currentTheme = t;
+    }
+    function cycleTheme() { applyTheme(currentTheme === 'dark' ? 'light' : 'dark'); }
+    applyTheme(currentTheme);
+
+    // === Scroll Reveal ===
+    document.querySelectorAll('[data-reveal]').forEach(function(el) { el.classList.add('reveal'); });
+    var revealObserver = new IntersectionObserver(function(entries) {
+      entries.forEach(function(e) { if (e.isIntersecting) { e.target.classList.add('visible'); revealObserver.unobserve(e.target); } });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach(function(el) { revealObserver.observe(el); });
+
+    // === Number Counters ===
+    function animateCounters() {
+      document.querySelectorAll('[data-count]').forEach(function(el) {
+        if (el.dataset.counted) return;
+        el.dataset.counted = '1';
+        var target = parseFloat(el.dataset.count), prefix = el.dataset.prefix || '', suffix = el.dataset.suffix || '';
+        var start = performance.now(), duration = 1000;
+        (function tick(now) {
+          var p = Math.min((now - start) / duration, 1), eased = 1 - Math.pow(1 - p, 3);
+          el.textContent = prefix + Math.round(target * eased).toLocaleString() + suffix;
+          if (p < 1) requestAnimationFrame(tick);
+        })(start);
+      });
+    }
+    var counterEl = document.querySelector('[data-count]');
+    if (counterEl) {
+      var cObs = new IntersectionObserver(function(entries) {
+        entries.forEach(function(e) { if (e.isIntersecting) { animateCounters(); cObs.disconnect(); } });
+      }, { threshold: 0.3 });
+      cObs.observe(counterEl);
+    }
+
+    // === Interaction: before/after location diagram ===
+    var baState = 'before';
+    function showBA(which) {
+      baState = which;
+      document.getElementById('baBefore').classList.toggle('active', which === 'before');
+      document.getElementById('baAfter').classList.toggle('active', which === 'after');
+      document.getElementById('baBtnBefore').setAttribute('aria-pressed', String(which === 'before'));
+      document.getElementById('baBtnAfter').setAttribute('aria-pressed', String(which === 'after'));
+    }
+
+    // === Interaction: copy code block ===
+    function copyCode(btn) {
+      var pre = btn.parentNode.querySelector('pre');
+      if (!pre) return;
+      var text = pre.innerText;
+      var done = function() {
+        var old = btn.textContent;
+        btn.textContent = '복사됨';
+        btn.classList.add('done');
+        setTimeout(function() { btn.textContent = old; btn.classList.remove('done'); }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function() {});
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) {}
+        document.body.removeChild(ta);
+      }
+    }
+
+    // === Download PNG ===
+    async function downloadImage() {
+      var menu = document.querySelector('.viz-menu');
+      menu.style.display = 'none';
+      try {
+        var url = await htmlToImage.toPng(document.body, { quality: 1, pixelRatio: 2, backgroundColor: getComputedStyle(document.body).backgroundColor, filter: function(n) { return !n.classList || !n.classList.contains('viz-menu'); } });
+        var a = document.createElement('a'); a.href = url;
+        a.download = 'symlink-manager-usage.png'; a.click();
+      } catch (e) { console.error('Download failed:', e); }
+      menu.style.display = '';
+    }
+  </script>
+</body>
+</html>

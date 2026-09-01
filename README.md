@@ -18,6 +18,15 @@ All three write. None of them is a read-only auditor — see
 [Harness support](#harness-support) and [`CLAUDE.md`](CLAUDE.md) for each
 skill's safety contract.
 
+### Visual guides and worked examples (GitHub Pages)
+
+- `mise-migrate` — [visual guide](https://deity719.github.io/devenv-skills/skill-guides/mise-migrate.html) · [usage example](https://deity719.github.io/devenv-skills/skill-output/mise-migrate-usage.html) (legacy venv project to mise + uv migration plan)
+- `symlink-manager` — [visual guide](https://deity719.github.io/devenv-skills/skill-guides/symlink-manager.html) · [usage example](https://deity719.github.io/devenv-skills/skill-output/symlink-manager-usage.html) (config file to dotfiles symlink and commit)
+- `ssh-delegate` — [visual guide](https://deity719.github.io/devenv-skills/skill-guides/ssh-delegate.html) · [usage example](https://deity719.github.io/devenv-skills/skill-output/ssh-delegate-usage.html) (ad-hoc ssh-copy-id to audited manifest)
+
+Each page is generated from a Markdown source under
+[`docs/skill-guides/`](docs/skill-guides) and [`docs/skill-output/`](docs/skill-output).
+
 ## Install
 
 ### Claude Code

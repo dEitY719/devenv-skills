@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="ko" class="theme-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mise-migrate — 스킬 가이드</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { interpolate-size: allow-keywords; }
+
+    /* ===== THEMES (class-based ONLY) ===== */
+    html.theme-dark {
+      --bg: #0A0A0A; --surface: #141414; --surface-hover: #1C1C1C;
+      --border: rgba(255,255,255,0.08);
+      --text: #EDEDED; --text-secondary: #8b8b8b;
+      --accent: #3b82f6; --accent-secondary: #8b5cf6;
+      --positive: #10b981; --negative: #f43f5e; --warning: #f59e0b;
+      --code-bg: #0F0F0F;
+    }
+    html.theme-light {
+      --bg: #FAFAF9; --surface: #FFFFFF; --surface-hover: #F5F5F4;
+      --border: rgba(0,0,0,0.10);
+      --text: #0f172a; --text-secondary: #5b6478;
+      --accent: #2563eb; --accent-secondary: #7c3aed;
+      --positive: #059669; --negative: #e11d48; --warning: #b45309;
+      --code-bg: #F4F4F2;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg); color: var(--text);
+      font-size: 17px; line-height: 1.7; -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.01em;
+      transition: background 0.3s, color 0.3s;
+      scrollbar-gutter: stable;
+      overflow-x: hidden;
+    }
+    h1,h2,h3,h4 { color: var(--text); letter-spacing: -0.035em; line-height: 1.12; text-wrap: balance; }
+    h1 { font-weight: 800; font-size: clamp(3rem, 9vw, 4.6rem); }
+    h2 { font-weight: 700; font-size: clamp(2rem, 5.2vw, 2.6rem); }
+    h3 { font-weight: 700; font-size: clamp(1.5rem, 3.6vw, 1.7rem); }
+    h4 { font-weight: 600; font-size: 1.15rem; letter-spacing: -0.02em; }
+    p, li, td, th, span, label { color: var(--text); font-weight: 400; }
+    .text-secondary { color: var(--text-secondary); }
+    code, pre, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+    code { font-size: 0.9em; }
+
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; width: 100%; }
+
+    /* ===== HERO ===== */
+    .hero { padding: 96px 0 56px; border-bottom: 1px solid var(--border); }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 0.82rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 20px;
+    }
+    .eyebrow::before { content: ''; width: 28px; height: 2px; background: var(--accent); border-radius: 2px; }
+    .hero h1 .grad {
+      background: linear-gradient(100deg, var(--accent), var(--accent-secondary));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .lede { font-size: 1.2rem; max-width: 62ch; margin-top: 22px; color: var(--text-secondary); line-height: 1.75; }
+    .lede strong { color: var(--text); font-weight: 600; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .pill {
+      font-size: 0.85rem; font-weight: 600; padding: 7px 14px; border-radius: 999px;
+      border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary);
+    }
+    .pill.hot { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 40%, transparent); }
+
+    /* ===== SECTION ===== */
+    section { padding: 64px 0; border-bottom: 1px solid var(--border); }
+    section:last-of-type { border-bottom: none; }
+    .sec-head { margin-bottom: 34px; }
+    .sec-num {
+      font-size: 0.8rem; font-weight: 700; letter-spacing: 0.14em;
+      color: var(--text-secondary); display: block; margin-bottom: 10px;
+    }
+    .sec-sub { color: var(--text-secondary); margin-top: 12px; font-size: 1.02rem; max-width: 68ch; }
+
+    /* ===== CARD ===== */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 26px;
+      transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    }
+    .card:hover { box-shadow: 0 0 0 1px var(--border), 0 10px 26px rgba(0,0,0,0.12); transform: translateY(-2px); }
+
+    /* ===== USE / DONT-USE PAIR ===== */
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+    .pair .card { position: relative; overflow: hidden; padding-top: 30px; }
+    .pair .card::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 4px; }
+    .card-yes::before { background: var(--positive); }
+    .card-no::before { background: var(--negative); }
+    .card-title { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+    .badge {
+      width: 30px; height: 30px; border-radius: 9px; flex: 0 0 30px;
+      display: grid; place-items: center; font-size: 1rem; font-weight: 800; color: #fff;
+    }
+    .card-yes .badge { background: var(--positive); }
+    .card-no .badge { background: var(--negative); }
+    .card-yes .card-title h3 { color: var(--positive); }
+    .card-no .card-title h3 { color: var(--negative); }
+    .list { list-style: none; display: flex; flex-direction: column; gap: 16px; }
+    .list li { position: relative; padding-left: 24px; font-size: 1rem; line-height: 1.65; }
+    .list li::before {
+      content: ''; position: absolute; left: 4px; top: 0.62em;
+      width: 7px; height: 7px; border-radius: 50%;
+    }
+    .card-yes .list li::before { background: var(--positive); }
+    .card-no .list li::before { background: var(--negative); }
+
+    /* ===== CODE BLOCK ===== */
+    .codeblock {
+      background: var(--code-bg); border: 1px solid var(--border); border-radius: 12px;
+      padding: 18px 20px; display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; flex-wrap: wrap; margin-bottom: 26px;
+    }
+    .codeblock code { font-size: 1.02rem; font-weight: 500; word-break: break-word; }
+    .codeblock .tok-cmd { color: var(--accent); font-weight: 700; }
+    .codeblock .tok-arg { color: var(--text-secondary); }
+    .btn {
+      font-family: inherit; font-size: 0.86rem; font-weight: 600; cursor: pointer;
+      padding: 8px 15px; border-radius: 9px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text-secondary); transition: all 0.18s;
+      white-space: nowrap;
+    }
+    .btn:hover { background: var(--surface-hover); color: var(--text); border-color: var(--accent); }
+    .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* ===== MODE SWITCH (interaction) ===== */
+    .modebar {
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+      margin-bottom: 26px; padding: 14px 16px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    }
+    .modebar .mb-label { font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.04em; }
+    .seg { display: inline-flex; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 4px; gap: 4px; }
+    .seg button {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.88rem; font-weight: 600;
+      padding: 8px 16px; border: none; border-radius: 7px; cursor: pointer;
+      background: transparent; color: var(--text-secondary); transition: all 0.18s;
+    }
+    .seg button:hover { color: var(--text); }
+    .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+    .seg button.danger[aria-pressed="true"] { background: var(--warning); color: #14100a; }
+    .mode-note { font-size: 0.94rem; color: var(--text-secondary); }
+    .mode-note strong { color: var(--text); }
+
+    /* ===== TABLE ===== */
+    .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+    table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 0.98rem; }
+    thead th {
+      text-align: left; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--text-secondary); padding: 16px 20px; border-bottom: 1px solid var(--border);
+      background: var(--surface-hover); white-space: nowrap;
+    }
+    tbody td { padding: 15px 20px; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.6; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr { transition: background 0.18s, opacity 0.25s; }
+    tbody tr:hover { background: var(--surface-hover); }
+    td.c-flag { white-space: nowrap; }
+    td.c-flag code { font-weight: 600; color: var(--accent); }
+    td.c-def { white-space: nowrap; color: var(--text-secondary); }
+    .tag-on { color: var(--positive); font-weight: 700; }
+    .tag-off { color: var(--text-secondary); }
+    tr.dim { opacity: 0.32; }
+    tr.hl { background: color-mix(in srgb, var(--warning) 12%, transparent); }
+    tr.hl:hover { background: color-mix(in srgb, var(--warning) 18%, transparent); }
+
+    /* ===== STEPS ===== */
+    .steps { display: flex; flex-direction: column; gap: 0; }
+    .step { display: grid; grid-template-columns: 66px 1fr; gap: 22px; padding: 4px 0 30px; position: relative; }
+    .step:last-child { padding-bottom: 0; }
+    .step-num {
+      width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center;
+      font-size: 1.3rem; font-weight: 800; font-family: 'JetBrains Mono', monospace;
+      background: var(--surface); border: 1px solid var(--border); color: var(--accent);
+      transition: all 0.25s; z-index: 1;
+    }
+    .step::before {
+      content: ''; position: absolute; left: 26px; top: 56px; bottom: 4px; width: 2px;
+      background: var(--border);
+    }
+    .step:last-child::before { display: none; }
+    .step-body { padding-top: 4px; }
+    .step-body h3 { margin-bottom: 8px; }
+    .step-body p { color: var(--text-secondary); font-size: 1.02rem; }
+    .step-body p code, .step-body h3 code { color: var(--text); background: var(--code-bg); padding: 2px 6px; border-radius: 5px; }
+    .step-tag {
+      display: inline-block; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; padding: 3px 9px; border-radius: 6px; margin-left: 10px;
+      border: 1px solid var(--border); color: var(--text-secondary); vertical-align: middle;
+    }
+    .step-tag.readonly { color: var(--positive); border-color: color-mix(in srgb, var(--positive) 40%, transparent); }
+    .step-tag.writes { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 45%, transparent); }
+    .step.is-off { opacity: 0.34; }
+    .step.is-on .step-num { background: var(--warning); color: #14100a; border-color: var(--warning); }
+    .plan4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 16px; }
+    .plan4 div {
+      background: var(--code-bg); border: 1px solid var(--border); border-radius: 9px;
+      padding: 11px 13px; font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5;
+    }
+    .plan4 div b { display: block; color: var(--text); font-size: 0.82rem; font-weight: 700; margin-bottom: 3px; }
+
+    /* ===== WARNINGS ===== */
+    .warn-wrap {
+      border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+      border-radius: 16px; padding: 8px 26px 12px;
+      background: color-mix(in srgb, var(--warning) 6%, var(--surface));
+    }
+    .warn-item { padding: 22px 0; border-bottom: 1px dashed var(--border); }
+    .warn-item:last-child { border-bottom: none; }
+    .warn-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
+    .warn-ico {
+      flex: 0 0 24px; width: 24px; height: 24px; border-radius: 7px; margin-top: 3px;
+      background: var(--warning); color: #14100a; display: grid; place-items: center;
+      font-size: 0.85rem; font-weight: 900;
+    }
+    .warn-head h4 { color: var(--warning); }
+    .warn-item p { padding-left: 36px; color: var(--text-secondary); font-size: 1rem; }
+    .warn-item p strong { color: var(--text); font-weight: 600; }
+    .warn-item p code { background: var(--code-bg); padding: 2px 6px; border-radius: 5px; color: var(--text); }
+    .warn-mini { display: flex; flex-wrap: wrap; gap: 10px; padding-left: 36px; margin-top: 10px; }
+
+    footer { padding: 44px 0 72px; }
+    footer p { color: var(--text-secondary); font-size: 0.92rem; }
+
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .animate { animation: fadeInUp 0.6s ease-out both; }
+    .animate.delay-1 { animation-delay: 0.08s; }
+    .animate.delay-2 { animation-delay: 0.16s; }
+    .animate.delay-3 { animation-delay: 0.24s; }
+    .animate.delay-4 { animation-delay: 0.32s; }
+    .animate.delay-5 { animation-delay: 0.40s; }
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      html { scroll-behavior: auto; }
+      .reveal { opacity: 1; transform: none; }
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 760px) {
+      body { font-size: 16px; }
+      .hero { padding: 72px 0 44px; }
+      section { padding: 48px 0; }
+      .pair { grid-template-columns: 1fr; gap: 18px; }
+      .step { grid-template-columns: 48px 1fr; gap: 16px; }
+      .step-num { width: 44px; height: 44px; font-size: 1.1rem; border-radius: 12px; }
+      .step::before { left: 22px; top: 48px; }
+      .warn-wrap { padding: 4px 18px 8px; }
+      .warn-item p, .warn-mini { padding-left: 0; }
+      .codeblock { flex-direction: column; align-items: flex-start; }
+    }
+
+    /* ===== PRINT ===== */
+    @media print {
+      body { background: white !important; color: black !important; font-size: 11pt; }
+      .viz-menu, .modebar, .btn { display: none !important; }
+      .reveal { display: revert; opacity: 1 !important; transform: none !important; }
+      .step.is-off, tr.dim { opacity: 1 !important; }
+      .card { break-inside: avoid; border: 1px solid #ddd; box-shadow: none; }
+      section { break-inside: auto; border-bottom: 1px solid #ddd; }
+      .warn-item, .step { break-inside: avoid; }
+      * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+    @page { margin: 1in; }
+
+    /* ===== MENU ===== */
+    .viz-menu { position: fixed; top: 16px; right: 16px; z-index: 9999; }
+    .viz-menu-toggle {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); cursor: pointer; display: flex;
+      align-items: center; justify-content: center;
+      backdrop-filter: blur(12px); transition: all 0.2s;
+    }
+    .viz-menu-toggle:hover { background: var(--surface-hover); }
+    .viz-menu-dropdown {
+      position: absolute; top: 52px; right: 0; min-width: 200px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 8px;
+      opacity: 0; visibility: hidden; transform: translateY(-8px);
+      transition: all 0.2s; backdrop-filter: blur(16px);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.18);
+    }
+    .viz-menu-dropdown.open { opacity: 1; visibility: visible; transform: translateY(0); }
+    .viz-menu-dropdown button {
+      width: 100%; padding: 10px 14px; border: none; border-radius: 8px;
+      background: transparent; color: var(--text); font-size: 14px;
+      font-family: inherit; cursor: pointer; text-align: left;
+      display: flex; align-items: center; gap: 10px; transition: background 0.15s;
+    }
+    .viz-menu-dropdown button:hover { background: var(--surface-hover); }
+
+    /* ===== SKIP TO CONTENT ===== */
+    .skip-to-content {
+      position: absolute; top: -60px; left: 6px; background: var(--accent);
+      color: white; padding: 8px 14px; text-decoration: none;
+      border-radius: 6px; opacity: 0; pointer-events: none;
+      transition: all 0.2s; z-index: 10000; font-weight: 600;
+    }
+    .skip-to-content:focus { top: 6px; opacity: 1; pointer-events: auto; }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-to-content">본문으로 건너뛰기</a>
+
+  <!-- MENU -->
+  <div class="viz-menu">
+    <button class="viz-menu-toggle" onclick="toggleMenu()" aria-label="메뉴 열기" aria-haspopup="true">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="15" x2="17" y2="15"/>
+      </svg>
+    </button>
+    <div class="viz-menu-dropdown" id="vizMenuDropdown">
+      <button onclick="cycleTheme()" aria-label="테마 전환"><span id="themeIcon" style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span><span id="themeLabel">Dark</span></button>
+      <button onclick="downloadImage()" aria-label="PNG 내려받기"><span style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span><span>Download PNG</span></button>
+      <button onclick="window.print()" aria-label="인쇄 또는 PDF 저장"><span style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></span><span>Print / PDF</span></button>
+    </div>
+  </div>
+
+  <main id="main-content">
+
+    <!-- HERO -->
+    <header class="hero">
+      <div class="wrap">
+        <span class="eyebrow animate">devenv 스킬 가이드</span>
+        <h1 class="animate delay-1"><span class="grad">mise-migrate</span></h1>
+        <p class="lede animate delay-2">
+          legacy Python venv/pip 프로젝트를 입력받아 <strong>`mise.toml`(tools + env + tasks SSOT)
+          과 uv 가 소유하는 의존성 구조</strong>를 산출한다. 기본은 <strong>--dry-run</strong> 이라
+          산출물은 "쓰여진 파일"이 아니라 <strong>검토용 마이그레이션 플랜 4종</strong>이다.
+        </p>
+        <div class="pill-row animate delay-3">
+          <span class="pill">Python 전용</span>
+          <span class="pill">기본 --dry-run</span>
+          <span class="pill">mise + uv</span>
+          <span class="pill hot">롤백 없음</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 언제 쓰나 / 언제 안 쓰나 -->
+    <section aria-labelledby="sec-when">
+      <div class="wrap">
+        <div class="sec-head" data-reveal>
+          <span class="sec-num">01 / SCOPE</span>
+          <h2 id="sec-when">언제 쓰나 · 언제 안 쓰나</h2>
+          <p class="sec-sub">이 스킬은 <strong>한 프로젝트의 툴체인 구조</strong>만 다룬다. 범위를 벗어나면 개선하지 않고 거부하거나 no-op 으로 빠진다.</p>
+        </div>
+
+        <div class="pair">
+          <article class="card card-yes" data-reveal>
+            <div class="card-title">
+              <span class="badge" aria-hidden="true">✓</span>
+              <h3>언제 쓰나</h3>
+            </div>
+            <ul class="list">
+              <li>pyenv / <code>python -m venv</code> + pip + setuptools 로 굴러온 Python 프로젝트를 mise + uv 로 옮길 때.</li>
+              <li>옮기기 전에 무엇이 바뀌는지(빌드 백엔드, dev 의존성 위치, 삭제될 <code>.venv/</code>) 먼저 확인하고 싶을 때.</li>
+            </ul>
+          </article>
+
+          <article class="card card-no" data-reveal>
+            <div class="card-title">
+              <span class="badge" aria-hidden="true">✕</span>
+              <h3>언제 안 쓰나</h3>
+            </div>
+            <ul class="list">
+              <li><strong>Python 이 아닌 프로젝트</strong> — node/go 등은 설계상 범위 밖이며 즉시 거부한다.</li>
+              <li><strong>이미 <code>mise.toml</code> 이 있는 디렉터리</strong> — 멱등 no-op 으로 빠진다.</li>
+              <li>설정 파일을 dotfiles 로 옮겨 심볼릭 링크하려는 경우는 <code>symlink-manager</code>, SSH 키 위임은 <code>ssh-delegate</code> 다.</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 호출 형식 -->
+    <section aria-labelledby="sec-usage">
+      <div class="wrap">
+        <div class="sec-head" data-reveal>
+          <span class="sec-num">02 / USAGE</span>
+          <h2 id="sec-usage">호출 형식</h2>
+          <p class="sec-sub">아래 모드 스위치로 <code>--dry-run</code> 과 <code>--apply</code> 각각에서 실제로 의미가 있는 플래그와 단계만 남겨 볼 수 있다.</p>
+        </div>
+
+        <div class="codeblock" data-reveal>
+          <code id="usageLine"><span class="tok-cmd">/devenv:mise-migrate</span> <span class="tok-arg">[path] [flags]</span></code>
+          <button class="btn" id="copyBtn" onclick="copyUsage()" aria-label="호출 형식 복사">복사</button>
+        </div>
+
+        <div class="modebar" data-reveal>
+          <span class="mb-label">모드</span>
+          <div class="seg" role="group" aria-label="실행 모드 선택">
+            <button type="button" id="modeDry" aria-pressed="true" onclick="setMode('dry')">--dry-run</button>
+            <button type="button" id="modeApply" class="danger" aria-pressed="false" onclick="setMode('apply')">--apply</button>
+          </div>
+          <p class="mode-note" id="modeNote"><strong>기본값.</strong> 플랜만 출력하고 아무것도 쓰지 않는다.</p>
+        </div>
+
+        <div class="table-scroll" data-reveal>
+          <table>
+            <caption class="text-secondary" style="text-align:left;padding:14px 20px 0;font-size:0.88rem;">인자 및 플래그</caption>
+            <thead>
+              <tr><th scope="col">인자/플래그</th><th scope="col">기본값</th><th scope="col">설명</th></tr>
+            </thead>
+            <tbody>
+              <tr data-mode="both"><td class="c-flag"><code>[path]</code></td><td class="c-def"><code>.</code></td><td>대상 프로젝트 디렉터리</td></tr>
+              <tr data-mode="dry"><td class="c-flag"><code>--dry-run</code></td><td class="c-def"><span class="tag-on">on</span></td><td>플랜만 출력, 아무것도 쓰지 않음</td></tr>
+              <tr data-mode="apply"><td class="c-flag"><code>--apply</code></td><td class="c-def"><span class="tag-off">off</span></td><td><code>mise.toml</code> 작성 + <code>pyproject.toml</code> 재작성 + <code>uv sync</code> + 정리</td></tr>
+              <tr data-mode="both"><td class="c-flag"><code>--backend &lt;name&gt;</code></td><td class="c-def"><code>hatchling</code></td><td><code>hatchling</code> 또는 <code>uv_build</code></td></tr>
+              <tr data-mode="apply"><td class="c-flag"><code>--keep-venv</code></td><td class="c-def"><span class="tag-off">off</span></td><td>기존 <code>.venv/</code>, <code>*.egg-info/</code> 를 지우지 않음</td></tr>
+              <tr data-mode="apply"><td class="c-flag"><code>--update-docs</code></td><td class="c-def"><span class="tag-off">off</span></td><td><code>--apply</code> 와 함께일 때만, 레포 내 stale 문서를 uv 워크플로로 재작성</td></tr>
+              <tr data-mode="both"><td class="c-flag"><code>-h</code> / <code>--help</code> / <code>help</code></td><td class="c-def">—</td><td>도움말 출력 후 종료 (탐지·변경 없음)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 동작 단계 -->
+    <section aria-labelledby="sec-steps">
+      <div class="wrap">
+        <div class="sec-head" data-reveal>
+          <span class="sec-num">03 / FLOW</span>
+          <h2 id="sec-steps">동작 단계</h2>
+          <p class="sec-sub">1–3 단계는 읽기 전용이다. 4 단계는 <code>--apply</code> 일 때만 실행된다.</p>
+        </div>
+
+        <div class="steps">
+          <article class="step" id="step-1" data-reveal>
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <h3>탐지<span class="step-tag readonly">read-only</span></h3>
+              <p><code>pyproject.toml</code> / <code>setup.py</code> / <code>requirements*.txt</code> 마커 확인.
+                 마커가 없고 직속 하위 디렉터리 하나에만 있으면 그쪽으로 재타게팅한다.</p>
+            </div>
+          </article>
+
+          <article class="step" id="step-2" data-reveal>
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <h3>추출<span class="step-tag readonly">read-only</span></h3>
+              <p>Python 버전, 런타임/dev 의존성, <code>[project.scripts]</code>, 테스트 러너와 <code>testpaths</code>,
+                 빌드 백엔드, 설정된 linter(ruff/mypy).</p>
+            </div>
+          </article>
+
+          <article class="step" id="step-3" data-reveal>
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <h3>플랜 4종<span class="step-tag readonly">read-only</span></h3>
+              <p>검토용 산출물 네 가지를 출력한다.</p>
+              <div class="plan4">
+                <div><b>mise.toml</b>생성될 파일</div>
+                <div><b>pyproject.toml</b>diff</div>
+                <div><b>정리 목록</b>삭제 대상</div>
+                <div><b>legacy 스캔</b>레포 내 venv/pip 참조 <code>file:line</code></div>
+              </div>
+            </div>
+          </article>
+
+          <article class="step" id="step-4" data-reveal>
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <h3><code>--apply</code> 일 때만<span class="step-tag writes">writes</span></h3>
+              <p>위 순서대로 쓰고 <code>uv sync</code> 실행 후 정리.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 주의사항 -->
+    <section aria-labelledby="sec-warn">
+      <div class="wrap">
+        <div class="sec-head" data-reveal>
+          <span class="sec-num">04 / CAVEATS</span>
+          <h2 id="sec-warn">주의사항 / 제약</h2>
+          <p class="sec-sub">이 스킬은 파괴적이다. <code>--apply</code> 전에 아래를 모두 읽을 것.</p>
+        </div>
+
+        <div class="warn-wrap" data-reveal>
+          <div class="warn-item">
+            <div class="warn-head">
+              <span class="warn-ico" aria-hidden="true">!</span>
+              <h4>롤백이 없다</h4>
+            </div>
+            <p><code>--apply</code> 는 첫 실패에서 멈추고 부분 상태를 보고한다. <strong>되돌리는 것은 사용자 몫이다.</strong></p>
+          </div>
+
+          <div class="warn-item">
+            <div class="warn-head">
+              <span class="warn-ico" aria-hidden="true">!</span>
+              <h4>PEP 735 silent regression</h4>
+            </div>
+            <p>dev 의존성이 <code>optional-dependencies</code> 에서 <code>[dependency-groups]</code> 로 올라가면
+               <code>pip install -e ".[dev]"</code> 는 <strong>exit 0 인 채로 아무것도 설치하지 않는다.</strong>
+               스킬이 이 경우 항상 <code>[WARN]</code> 을 띄우므로, 해당 호출부를 <code>uv sync</code> 로 바꿔야 한다.</p>
+          </div>
+
+          <div class="warn-item">
+            <div class="warn-head">
+              <span class="warn-ico" aria-hidden="true">!</span>
+              <h4>pin 은 floor 일 수 있다</h4>
+            </div>
+            <p><code>.venv/pyvenv.cfg</code> 가 없으면 <code>requires-python</code> 하한을 그대로 pin 하며,
+               <code>uv sync</code> 는 그보다 최신 인터프리터를 고를 수 있다.</p>
+          </div>
+
+          <div class="warn-item">
+            <div class="warn-head">
+              <span class="warn-ico" aria-hidden="true">!</span>
+              <h4>범위 밖은 건드리지 않는다</h4>
+            </div>
+            <p>프로젝트에 없는 linter 용 task 는 만들지 않는다. <strong>소스 코드는 건드리지 않는다.</strong></p>
+            <div class="warn-mini">
+              <span class="pill hot"><code>--apply</code> 는 <code>uv</code> 가 <code>PATH</code> 에 있어야 한다</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="wrap">
+        <p>출처: <code>docs/skill-guides/mise-migrate.md</code> — devenv 플러그인 스킬 가이드</p>
+      </div>
+    </footer>
+
+  </main>
+
+  <script>
+    var vizMoonIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+    var vizSunIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>';
+
+    // === Menu ===
+    function toggleMenu() {
+      var dropdown = document.getElementById('vizMenuDropdown');
+      if (dropdown) dropdown.classList.toggle('open');
+    }
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('.viz-menu')) {
+        var dropdown = document.getElementById('vizMenuDropdown');
+        if (dropdown) dropdown.classList.remove('open');
+      }
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        var dropdown = document.getElementById('vizMenuDropdown');
+        if (dropdown) dropdown.classList.remove('open');
+      }
+    });
+
+    // === Theme (class-based) ===
+    var savedTheme = localStorage.getItem('viz-theme');
+    var currentTheme = savedTheme || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    function applyTheme(t) {
+      document.documentElement.className = 'theme-' + t;
+      document.getElementById('themeIcon').innerHTML = t === 'dark' ? vizMoonIcon : vizSunIcon;
+      document.getElementById('themeLabel').textContent = t === 'dark' ? 'Dark' : 'Light';
+      localStorage.setItem('viz-theme', t);
+      currentTheme = t;
+    }
+    function cycleTheme() { applyTheme(currentTheme === 'dark' ? 'light' : 'dark'); }
+    applyTheme(currentTheme);
+
+    // === Scroll Reveal ===
+    document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('reveal'); });
+    var revealObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('visible'); revealObserver.unobserve(e.target); }
+      });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach(function (el) { revealObserver.observe(el); });
+
+    // === Interaction: dry-run / apply mode switch ===
+    var vizMode = 'dry';
+    var modeNotes = {
+      dry: '<strong>기본값.</strong> 플랜만 출력하고 아무것도 쓰지 않는다.',
+      apply: '<strong>쓰기 모드.</strong> mise.toml 작성 + pyproject.toml 재작성 + uv sync + 정리. 롤백은 없다.'
+    };
+    function setMode(m) {
+      vizMode = m;
+      document.getElementById('modeDry').setAttribute('aria-pressed', String(m === 'dry'));
+      document.getElementById('modeApply').setAttribute('aria-pressed', String(m === 'apply'));
+      document.getElementById('modeNote').innerHTML = modeNotes[m];
+
+      document.querySelectorAll('tbody tr[data-mode]').forEach(function (row) {
+        var scope = row.getAttribute('data-mode');
+        var relevant = (scope === 'both' || scope === m);
+        row.classList.toggle('dim', !relevant);
+        row.classList.toggle('hl', m === 'apply' && scope === 'apply');
+      });
+
+      var step4 = document.getElementById('step-4');
+      step4.classList.toggle('is-off', m !== 'apply');
+      step4.classList.toggle('is-on', m === 'apply');
+
+      var usage = document.getElementById('usageLine');
+      usage.innerHTML = m === 'apply'
+        ? '<span class="tok-cmd">/devenv:mise-migrate</span> <span class="tok-arg">[path]</span> --apply'
+        : '<span class="tok-cmd">/devenv:mise-migrate</span> <span class="tok-arg">[path] [flags]</span>';
+    }
+    setMode('dry');
+
+    // === Interaction: copy usage line ===
+    function copyUsage() {
+      var btn = document.getElementById('copyBtn');
+      var txt = document.getElementById('usageLine').textContent.trim();
+      var done = function () {
+        btn.textContent = '복사됨';
+        setTimeout(function () { btn.textContent = '복사'; }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(done, done);
+      } else { done(); }
+    }
+
+    // === Download PNG ===
+    async function downloadImage() {
+      var menu = document.querySelector('.viz-menu');
+      menu.style.display = 'none';
+      try {
+        var url = await htmlToImage.toPng(document.body, {
+          quality: 1, pixelRatio: 2,
+          backgroundColor: getComputedStyle(document.body).backgroundColor,
+          filter: function (n) { return !n.classList || !n.classList.contains('viz-menu'); }
+        });
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = document.title.replace(/\s+/g, '-').toLowerCase() + '.png';
+        a.click();
+      } catch (e) { console.error('Download failed:', e); }
+      menu.style.display = '';
+    }
+  </script>
+</body>
+</html>

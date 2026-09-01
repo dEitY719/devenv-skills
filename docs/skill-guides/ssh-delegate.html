@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ko" class="theme-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ssh-delegate — 스킬 가이드</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { interpolate-size: allow-keywords; }
+
+    /* ===== THEMES (class-based ONLY) ===== */
+    html.theme-dark {
+      --bg: #0A0A0A; --surface: #141414; --surface-hover: #1C1C1C;
+      --border: rgba(255,255,255,0.08);
+      --text: #EDEDED; --text-secondary: #8b8b8b;
+      --accent: #3b82f6; --accent-secondary: #8b5cf6;
+      --positive: #10b981; --negative: #f43f5e; --warning: #f59e0b;
+      --code-bg: rgba(255,255,255,0.05);
+      --glow: rgba(59,130,246,0.16);
+    }
+    html.theme-light {
+      --bg: #FAFAF9; --surface: #FFFFFF; --surface-hover: #F5F5F4;
+      --border: rgba(0,0,0,0.10);
+      --text: #0f172a; --text-secondary: #64748b;
+      --accent: #2563eb; --accent-secondary: #7c3aed;
+      --positive: #059669; --negative: #e11d48; --warning: #d97706;
+      --code-bg: rgba(0,0,0,0.045);
+      --glow: rgba(37,99,235,0.10);
+    }
+
+    html { font-size: 16px; scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg); color: var(--text);
+      font-size: 1.0625rem; line-height: 1.72;
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.01em;
+      transition: background 0.3s, color 0.3s;
+      scrollbar-gutter: stable;
+      overflow-x: hidden;
+    }
+    h1,h2,h3,h4 { color: var(--text); letter-spacing: -0.035em; line-height: 1.14; text-wrap: balance; overflow-wrap: anywhere; }
+    h1 { font-weight: 800; font-size: clamp(3rem, 9vw, 5.25rem); letter-spacing: -0.05em; }
+    h2 { font-weight: 700; font-size: clamp(2rem, 5vw, 2.75rem); }
+    h3 { font-weight: 650; font-size: clamp(1.5rem, 3vw, 1.75rem); }
+    h4 { font-weight: 650; font-size: 1.15rem; line-height: 1.4; }
+    p, li, td, th, span, label { font-weight: 400; color: var(--text); }
+    .text-secondary { color: var(--text-secondary); }
+    code, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; letter-spacing: -0.01em; }
+    :not(pre) > code { background: var(--code-bg); border: 1px solid var(--border); border-radius: 5px; padding: 0.12em 0.4em; overflow-wrap: anywhere; }
+    strong { font-weight: 700; }
+
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+    section { padding: 68px 0; border-top: 1px solid var(--border); }
+    section:first-of-type { border-top: none; }
+
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 0.8rem; font-weight: 700; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--accent);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .eyebrow::before { content: ""; width: 22px; height: 2px; background: var(--accent); border-radius: 2px; }
+    .sec-head { margin-bottom: 34px; }
+    .sec-head p { color: var(--text-secondary); margin-top: 10px; max-width: 64ch; }
+    h2 + p, .eyebrow + h2 { margin-top: 12px; }
+
+    /* ===== CARD ===== */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 24px;
+      transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    }
+    .card:hover { box-shadow: 0 0 0 1px var(--border), 0 10px 26px rgba(0,0,0,0.16); transform: translateY(-2px); }
+
+    /* ===== HERO ===== */
+    .hero { padding: 84px 0 60px; }
+    .hero-badges { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 26px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 6px 13px; border-radius: 999px;
+      border: 1px solid var(--border); background: var(--surface);
+      font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+    .pill.danger { color: var(--negative); border-color: color-mix(in srgb, var(--negative) 45%, transparent); }
+    .pill.danger .dot { background: var(--negative); }
+    .lede { font-size: clamp(1.15rem, 2.4vw, 1.45rem); line-height: 1.6; max-width: 40ch; color: var(--text); margin-top: 4px; }
+    .lede em { font-style: normal; color: var(--accent); font-weight: 700; }
+    .hero-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 36px; align-items: end; }
+
+    .summary-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 14px; padding: 22px 24px;
+    }
+    .summary-box h4 { margin-bottom: 10px; }
+    .summary-box p { color: var(--text-secondary); font-size: 1rem; }
+
+    .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 44px; }
+    .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px 18px; }
+    .stat .n { font-size: 2.4rem; font-weight: 800; letter-spacing: -0.05em; line-height: 1; color: var(--accent); font-family: 'JetBrains Mono', monospace; }
+    .stat .n.warn { color: var(--warning); }
+    .stat .n.neg { color: var(--negative); }
+    .stat .l { font-size: 0.86rem; color: var(--text-secondary); margin-top: 9px; line-height: 1.45; }
+
+    /* ===== 언제 쓰나 / 안 쓰나 ===== */
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .use-card { border-top: 3px solid var(--positive); }
+    .use-card.no { border-top-color: var(--negative); }
+    .use-head { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+    .use-mark {
+      width: 30px; height: 30px; border-radius: 9px; flex: 0 0 auto;
+      display: grid; place-items: center; font-weight: 800; font-size: 1rem;
+      background: color-mix(in srgb, var(--positive) 16%, transparent); color: var(--positive);
+    }
+    .use-card.no .use-mark { background: color-mix(in srgb, var(--negative) 16%, transparent); color: var(--negative); }
+    .use-card ul { list-style: none; display: grid; gap: 13px; }
+    .use-card li { position: relative; padding-left: 20px; font-size: 1rem; line-height: 1.62; }
+    .use-card li::before {
+      content: ""; position: absolute; left: 0; top: 0.62em;
+      width: 7px; height: 7px; border-radius: 2px; background: var(--positive); opacity: 0.75;
+    }
+    .use-card.no li::before { background: var(--negative); }
+
+    /* ===== INVOCATION + TABLE ===== */
+    .cmd-bar {
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px 18px; margin-bottom: 26px;
+    }
+    .cmd-bar .mono { font-size: 1.02rem; font-weight: 500; overflow-wrap: anywhere; }
+    .cmd-bar .prompt { color: var(--accent-secondary); font-weight: 700; }
+    .copy-btn {
+      margin-left: auto; border: 1px solid var(--border); background: transparent;
+      color: var(--text-secondary); font-family: inherit; font-size: 0.85rem; font-weight: 600;
+      padding: 7px 14px; border-radius: 8px; cursor: pointer; transition: all 0.18s;
+    }
+    .copy-btn:hover { background: var(--surface-hover); color: var(--text); }
+    .copy-btn.ok { color: var(--positive); border-color: color-mix(in srgb, var(--positive) 50%, transparent); }
+
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+    .filter-btn {
+      border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary);
+      font-family: 'JetBrains Mono', monospace; font-size: 0.86rem; font-weight: 600;
+      padding: 7px 14px; border-radius: 999px; cursor: pointer; transition: all 0.18s;
+    }
+    .filter-btn:hover { background: var(--surface-hover); color: var(--text); }
+    .filter-btn[aria-pressed="true"] {
+      background: var(--accent); border-color: var(--accent); color: #fff;
+      box-shadow: 0 4px 14px var(--glow);
+    }
+
+    .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); -webkit-overflow-scrolling: touch; }
+    table { border-collapse: collapse; width: 100%; min-width: 660px; }
+    thead th {
+      text-align: left; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.11em;
+      text-transform: uppercase; color: var(--text-secondary);
+      padding: 15px 18px; border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    tbody td { padding: 15px 18px; border-bottom: 1px solid var(--border); font-size: 0.97rem; vertical-align: top; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr { transition: background 0.16s; }
+    tbody tr:hover { background: var(--surface-hover); }
+    tbody tr.hidden-row { display: none; }
+    td.sub code { background: transparent; border: none; padding: 0; color: var(--accent); font-weight: 700; font-size: 1rem; }
+    tr[data-sub="revoke"] td.sub code { color: var(--negative); }
+    td.args { color: var(--text-secondary); white-space: nowrap; }
+    td.args code { font-size: 0.85rem; }
+    .empty-note { padding: 20px 18px; color: var(--text-secondary); font-size: 0.95rem; }
+    .usage-note { margin-top: 16px; color: var(--text-secondary); font-size: 0.97rem; }
+
+    /* ===== SAFETY MODEL (centrepiece) ===== */
+    .safety { position: relative; }
+    .layers { display: grid; gap: 18px; }
+    .layer {
+      position: relative; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 16px;
+      padding: 26px 28px 26px 30px; overflow: hidden;
+      transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+    }
+    .layer::before {
+      content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+      background: var(--lc, var(--accent));
+    }
+    .layer::after {
+      content: ""; position: absolute; right: -60px; top: -60px; width: 200px; height: 200px;
+      border-radius: 50%; background: var(--lc, var(--accent)); opacity: 0.055; pointer-events: none;
+    }
+    .layer:hover { transform: translateY(-3px); box-shadow: 0 14px 34px rgba(0,0,0,0.18); border-color: color-mix(in srgb, var(--lc) 40%, var(--border)); }
+    .layer.l1 { --lc: var(--accent); margin-left: 0; }
+    .layer.l2 { --lc: var(--negative); }
+    .layer.l3 { --lc: var(--accent-secondary); }
+    .layer-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+    .layer-tag {
+      font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: 0.86rem;
+      letter-spacing: 0.06em; padding: 5px 11px; border-radius: 7px;
+      background: color-mix(in srgb, var(--lc) 15%, transparent); color: var(--lc);
+      border: 1px solid color-mix(in srgb, var(--lc) 35%, transparent);
+    }
+    .layer p { font-size: 1.02rem; color: var(--text); max-width: 72ch; }
+    .layer .sub { color: var(--text-secondary); font-size: 0.97rem; margin-top: 8px; }
+    .alert-strip {
+      display: flex; gap: 13px; align-items: flex-start;
+      margin-top: 18px; padding: 15px 17px; border-radius: 11px;
+      background: color-mix(in srgb, var(--negative) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--negative) 42%, transparent);
+    }
+    .alert-strip .ic { color: var(--negative); font-weight: 800; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; letter-spacing: 0.08em; flex: 0 0 auto; padding-top: 1px; }
+    .alert-strip p { font-size: 0.99rem; color: var(--text); }
+    .alert-strip strong { color: var(--negative); }
+    .layer-connector { display: grid; place-items: center; height: 20px; margin: -9px 0; position: relative; z-index: 1; }
+    .layer-connector span { color: var(--text-secondary); font-size: 0.95rem; font-family: 'JetBrains Mono', monospace; }
+
+    /* ===== STEPS ===== */
+    .steps { display: grid; gap: 14px; counter-reset: step; }
+    .step { display: flex; gap: 18px; align-items: flex-start; }
+    .step-n {
+      flex: 0 0 auto; width: 40px; height: 40px; border-radius: 12px;
+      display: grid; place-items: center; font-weight: 800; font-size: 1.05rem;
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--surface); border: 1px solid var(--border); color: var(--accent);
+    }
+    .step .card { flex: 1 1 auto; padding: 18px 22px; }
+    .step .card p { font-size: 1rem; }
+
+    /* ===== CAVEATS ===== */
+    .caveats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    .caveat { border-left: 3px solid var(--warning); }
+    .caveat.hard { border-left-color: var(--negative); }
+    .caveat.info { border-left-color: var(--accent); }
+    .caveat h4 { margin-bottom: 9px; display: flex; align-items: center; gap: 9px; }
+    .caveat .tagline {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 800;
+      letter-spacing: 0.12em; padding: 3px 8px; border-radius: 5px;
+      background: color-mix(in srgb, var(--warning) 16%, transparent); color: var(--warning);
+    }
+    .caveat.hard .tagline { background: color-mix(in srgb, var(--negative) 16%, transparent); color: var(--negative); }
+    .caveat.info .tagline { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+    .caveat p { color: var(--text-secondary); font-size: 0.98rem; }
+    .frozen-list { list-style: none; display: grid; gap: 7px; margin-top: 11px; }
+    .frozen-list li { font-size: 0.88rem; }
+
+    footer { padding: 46px 0 66px; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: 0.92rem; }
+    footer .mono { color: var(--text-secondary); }
+
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideInLeft { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: translateX(0); } }
+    .animate { animation: fadeInUp 0.62s ease-out both; }
+    .animate.delay-1 { animation-delay: 0.08s; }
+    .animate.delay-2 { animation-delay: 0.16s; }
+    .animate.delay-3 { animation-delay: 0.24s; }
+    .animate.delay-4 { animation-delay: 0.32s; }
+    .animate.delay-5 { animation-delay: 0.40s; }
+    .animate.delay-6 { animation-delay: 0.48s; }
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .reveal { opacity: 1; transform: none; }
+      html { scroll-behavior: auto; }
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 900px) {
+      .hero-grid { grid-template-columns: 1fr; gap: 26px; align-items: start; }
+      .stat-row { grid-template-columns: repeat(2, 1fr); }
+      .pair { grid-template-columns: 1fr; }
+      .caveats { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .wrap { padding: 0 16px; }
+      .hero { padding: 64px 0 44px; }
+      section { padding: 52px 0; }
+      .layer { padding: 22px 20px 22px 22px; }
+      .card { padding: 20px; }
+      .step { gap: 12px; }
+      .step-n { width: 34px; height: 34px; font-size: 0.95rem; }
+      .copy-btn { margin-left: 0; }
+    }
+
+    /* ===== PRINT ===== */
+    @media print {
+      body { background: white !important; color: black !important; }
+      .viz-menu, .filters, .copy-btn { display: none !important; }
+      .reveal { display: revert; opacity: 1 !important; transform: none !important; }
+      .card, .layer, .stat, .table-scroll { break-inside: avoid; border: 1px solid #ddd; box-shadow: none; }
+      tbody tr.hidden-row { display: table-row !important; }
+      section { border-top: 1px solid #ddd; }
+      * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+    @page { margin: 1in; @bottom-center { content: "Page " counter(page); font-size: 9pt; color: #666; } }
+
+    /* ===== MENU ===== */
+    .viz-menu { position: fixed; top: 16px; right: 16px; z-index: 9999; }
+    .viz-menu-toggle {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); cursor: pointer; display: flex;
+      align-items: center; justify-content: center;
+      backdrop-filter: blur(12px); transition: all 0.2s;
+    }
+    .viz-menu-toggle:hover { background: var(--surface-hover); }
+    .viz-menu-dropdown {
+      position: absolute; top: 52px; right: 0; min-width: 200px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 8px;
+      opacity: 0; visibility: hidden; transform: translateY(-8px);
+      transition: all 0.2s; backdrop-filter: blur(16px);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.22);
+    }
+    .viz-menu-dropdown.open { opacity: 1; visibility: visible; transform: translateY(0); }
+    .viz-menu-dropdown button {
+      width: 100%; padding: 10px 14px; border: none; border-radius: 8px;
+      background: transparent; color: var(--text); font-size: 14px;
+      font-family: inherit; cursor: pointer; text-align: left;
+      display: flex; align-items: center; gap: 10px; transition: background 0.15s;
+    }
+    .viz-menu-dropdown button:hover { background: var(--surface-hover); }
+
+    /* ===== SKIP TO CONTENT ===== */
+    .skip-to-content {
+      position: absolute; top: -60px; left: 6px; background: var(--accent);
+      color: white; padding: 8px 14px; text-decoration: none;
+      border-radius: 6px; opacity: 0; pointer-events: none;
+      transition: all 0.2s; z-index: 10000;
+    }
+    .skip-to-content:focus { top: 6px; opacity: 1; pointer-events: auto; position: fixed; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-to-content">본문으로 건너뛰기</a>
+
+  <!-- MENU -->
+  <div class="viz-menu">
+    <button class="viz-menu-toggle" onclick="toggleMenu()" aria-label="메뉴 열기" aria-haspopup="true">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="15" x2="17" y2="15"/>
+      </svg>
+    </button>
+    <div class="viz-menu-dropdown" id="vizMenuDropdown">
+      <button onclick="cycleTheme()" aria-label="테마 전환"><span id="themeIcon" style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span><span id="themeLabel">Dark</span></button>
+      <button onclick="downloadImage()" aria-label="PNG 다운로드"><span style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span><span>Download PNG</span></button>
+      <button onclick="window.print()" aria-label="인쇄 또는 PDF 저장"><span style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></span><span>Print / PDF</span></button>
+    </div>
+  </div>
+
+  <main id="main-content">
+
+    <!-- ===== HERO ===== -->
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="wrap">
+        <span class="eyebrow animate">devenv skill guide</span>
+        <h1 id="hero-title" class="animate delay-1" style="margin-top:16px;">ssh-delegate</h1>
+
+        <div class="hero-badges animate delay-2">
+          <span class="pill"><span class="dot"></span>~/.ssh/delegations.yml</span>
+          <span class="pill"><span class="dot"></span>mode 0600</span>
+          <span class="pill danger"><span class="dot"></span>원격 키 설치 · 회수</span>
+        </div>
+
+        <div class="hero-grid">
+          <div class="animate delay-3">
+            <p class="lede">일회성 <code>ssh-copy-id</code> 를 <em>매니페스트 + ssh config 드롭인 + JSONL 감사 로그</em>로 산출한다.</p>
+          </div>
+          <div class="summary-box animate delay-4">
+            <h4>한 줄 요약</h4>
+            <p>"어떤 키가 어느 호스트에 어떤 계정으로 설치되어 있는가"의 <strong>단일 진실 공급원</strong>을 만드는 것이 목적이다.</p>
+          </div>
+        </div>
+
+        <div class="stat-row">
+          <div class="stat animate delay-3"><div class="n" data-count="6">6</div><div class="l">서브커맨드</div></div>
+          <div class="stat animate delay-4"><div class="n warn" data-count="3">3</div><div class="l">단 안전 모델 (L1·L2·L3)</div></div>
+          <div class="stat animate delay-5"><div class="n">0600</div><div class="l">매니페스트 · config 드롭인 권한</div></div>
+          <div class="stat animate delay-6"><div class="n neg">0</div><div class="l"><code>unrevoke</code> 는 존재하지 않는다</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 언제 쓰나 / 언제 안 쓰나 ===== -->
+    <section aria-labelledby="when-title">
+      <div class="wrap">
+        <div class="sec-head" data-reveal>
+          <span class="eyebrow">scope</span>
+          <h2 id="when-title">언제 쓰나 · 언제 안 쓰나</h2>
+        </div>
+
+        <div class="pair">
+          <article class="card use-card" data-reveal>
+            <div class="use-head">
+              <span class="use-mark" aria-hidden="true">O</span>
+              <h3>언제 쓰나</h3>
+            </div>
+            <ul>
+              <li>AI/에이전트에게 SSH 접근을 위임하되, 그 위임 내역이 <strong>기록·감사</strong>되어야 할 때.</li>
+              <li>과거에 손으로 <code>ssh-copy-id</code> 한 호스트들을 매니페스트로 흡수해 관리할 때.</li>
+              <li>어떤 서버에 접근 가능한지 목록·검증(<code>list</code>, <code>test</code>, <code>doctor</code>)이 필요할 때.</li>
+              <li>위임을 회수할 때(<code>revoke</code> — 원격 <code>authorized_keys</code> 에서 키 제거).</li>
+            </ul>
+          </article>
+
+          <article class="card use-card no" data-reveal>
+            <div class="use-head">
+              <span class="use-mark" aria-hidden="true">X</span>
+              <h3>언제 안 쓰나</h3>
+            </div>
+            <ul>
+              <li>로컬 설정 파일 관리는 <code>symlink-manager</code>, Python 툴체인 이전은 <code>mise-migrate</code>. 이 스킬은 <strong>원격 호스트 접근 권한</strong>만 다룬다.</li>
+              <li>범용 SSH 클라이언트가 아니다. 매니페스트에 없는 호스트에는 alias 를 만들어 주지 않으며, 접속을 대신 주선하지도 않는다.</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 호출 형식 ===== -->
+    <section aria-labelledby="cmd-title">
+      <div class="wrap">
+        <div class="sec-head" data-reveal>
+          <span class="eyebrow">interface</span>
+          <h2 id="cmd-title">호출 형식</h2>
+          <p>첫 위치 인자가 서브커맨드다. 아래 칩을 눌러 표를 서브커맨드별로 좁혀 볼 수 있다.</p>
+        </div>
+
+        <div class="cmd-bar" data-reveal>
+          <span class="mono"><span class="prompt">/devenv:ssh-delegate</span> &lt;sub-command&gt; [args]</span>
+          <button class="copy-btn" id="copyBtn" onclick="copyInvocation()" aria-label="호출 형식 복사">복사</button>
+        </div>
+
+        <div class="filters" role="group" aria-label="서브커맨드 필터">
+          <button class="filter-btn" aria-pressed="true" onclick="filterSub('all', this)">전체</button>
+          <button class="filter-btn" aria-pressed="false" onclick="filterSub('sync', this)">sync</button>
+          <button class="filter-btn" aria-pressed="false" onclick="filterSub('add', this)">add</button>
+          <button class="filter-btn" aria-pressed="false" onclick="filterSub('list', this)">list</button>
+          <button class="filter-btn" aria-pressed="false" onclick="filterSub('test', this)">test</button>
+          <button class="filter-btn" aria-pressed="false" onclick="filterSub('revoke', this)">revoke</button>
+          <button class="filter-btn" aria-pressed="false" onclick="filterSub('doctor', this)">doctor</button>
+        </div>
+
+        <div class="table-scroll" data-reveal>
+          <table id="subTable">
+            <caption class="sr-only" style="position:absolute;left:-9999px;">ssh-delegate 서브커맨드와 인자, 효과</caption>
+            <thead>
+              <tr><th scope="col">서브커맨드</th><th scope="col">인자</th><th scope="col">효과</th></tr>
+            </thead>
+            <tbody>
+              <tr data-sub="sync"><td class="sub"><code>sync</code></td><td class="args">—</td><td>매니페스트 ↔ 실제 상태 조정. config 재생성, 지문 pin/검증</td></tr>
+              <tr data-sub="add"><td class="sub"><code>add</code></td><td class="args"><code>&lt;user&gt;@&lt;host&gt; [alias] [--dry-run] [--key-only]</code></td><td>항목 추가 + 키 설치 + 검증</td></tr>
+              <tr data-sub="list"><td class="sub"><code>list</code></td><td class="args"><code>[--json]</code></td><td>위임 테이블 / JSON 출력</td></tr>
+              <tr data-sub="test"><td class="sub"><code>test</code></td><td class="args"><code>[&lt;alias&gt;|--all]</code></td><td>BatchMode 도달성 검사</td></tr>
+              <tr data-sub="revoke"><td class="sub"><code>revoke</code></td><td class="args"><code>&lt;alias&gt;</code></td><td>원격 키 제거 + <code>revoked: true</code> 표시</td></tr>
+              <tr data-sub="doctor"><td class="sub"><code>doctor</code></td><td class="args">—</td><td>환경 + 매니페스트 health check</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="usage-note" data-reveal>인자가 없으면 usage 를 출력하고, 모르는 서브커맨드는 usage + <code>exit 2</code> 다.</p>
+      </div>
+    </section>
+
+    <!-- ===== 3단 안전 모델 (centrepiece) ===== -->
+    <section class="safety" aria-labelledby="safety-title">
+      <div class="wrap">
+        <div class="sec-head" data-reveal>
+          <span class="eyebrow">safety model</span>
+          <h2 id="safety-title">3단 안전 모델</h2>
+          <p>이 스킬은 원격 호스트의 <code>authorized_keys</code> 를 직접 건드린다. 세 층은 선택 사항이 아니라 계약이다.</p>
+        </div>
+
+        <div class="layers">
+          <article class="layer l1" data-reveal>
+            <div class="layer-top">
+              <span class="layer-tag">L1</span>
+              <h3>Identity</h3>
+            </div>
+            <p>매니페스트의 <code>identity_file</code> <strong>만</strong> 제시한다 — <code>IdentitiesOnly yes</code>.</p>
+            <p class="sub">에이전트 키가 무차별로 시도되지 않으므로, 어떤 키가 어디로 갔는지가 매니페스트 한 곳에서 결정된다.</p>
+          </article>
+
+          <div class="layer-connector" aria-hidden="true"><span>↓</span></div>
+
+          <article class="layer l2" data-reveal>
+            <div class="layer-top">
+              <span class="layer-tag">L2</span>
+              <h3>Host trust</h3>
+            </div>
+            <p>최초 설치 시 <strong>SHA256 호스트 지문을 pin</strong> 하고 <code>sync</code> 마다 재확인한다.</p>
+            <div class="alert-strip">
+              <span class="ic" aria-hidden="true">ALERT</span>
+              <p><strong>불일치는 ALERT 이며 즉시 중단</strong>한다. 재신뢰는 사람의 결정이다 — 지문 MISMATCH 를 우회하지 말 것.</p>
+            </div>
+          </article>
+
+          <div class="layer-connector" aria-hidden="true"><span>↓</span></div>
+
+          <article class="layer l3" data-reveal>
+            <div class="layer-top">
+              <span class="layer-tag">L3</span>
+              <h3>Allowlist + audit</h3>
+            </div>
+            <p>모든 이벤트를 <code>flock</code> 직렬화된 <strong>JSONL</strong> 로 남긴다.</p>
+            <p class="sub">매니페스트가 allowlist 이자 감사 대상이다. 목록에 없는 호스트는 alias 도 없고, 주선도 없다.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 동작 단계 ===== -->
+    <section aria-labelledby="steps-title">
+      <div class="wrap">
+        <div class="sec-head" data-reveal>
+          <span class="eyebrow">flow</span>
+          <h2 id="steps-title">동작 단계</h2>
+        </div>
+
+        <div class="steps">
+          <div class="step" data-reveal>
+            <div class="step-n">1</div>
+            <div class="card"><p>첫 위치 인자로 서브커맨드를 고른다.</p></div>
+          </div>
+          <div class="step" data-reveal>
+            <div class="step-n">2</div>
+            <div class="card"><p>번들된 <code>lib/ssh_delegate.sh</code> 에 인자를 넘겨 실행한다. 실제 로직은 전부 <code>lib/*.sh</code> 에 있고 <code>SKILL.md</code> 는 라우터일 뿐이다.</p></div>
+          </div>
+          <div class="step" data-reveal>
+            <div class="step-n">3</div>
+            <div class="card"><p>스크립트 출력을 그대로 전달하고, <code>add</code> 후 passwordless 접속을, <code>revoke</code> 후 <code>state=revoked</code> 를 확인해 보고한다.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 주의사항 / 제약 ===== -->
+    <section aria-labelledby="caveat-title">
+      <div class="wrap">
+        <div class="sec-head" data-reveal>
+          <span class="eyebrow">constraints</span>
+          <h2 id="caveat-title">주의사항 · 제약</h2>
+        </div>
+
+        <div class="caveats">
+          <article class="card caveat" data-reveal>
+            <h4><span class="tagline">TTY</span> <code>add</code> 는 TTY 가 필요하다</h4>
+            <p><code>ssh-copy-id</code> 가 원격 비밀번호를 한 번 묻는다. 비대화형 셸에서는 실행할 명령을 알려주며 fail-fast 한다.</p>
+          </article>
+
+          <article class="card caveat hard" data-reveal>
+            <h4><span class="tagline">NO UNDO</span> <code>revoke</code> 는 행을 지우지 않는다</h4>
+            <p><code>revoked: true</code> 로 표시해 감사 이력을 남기며, <code>unrevoke</code> 는 존재하지 않는다.</p>
+          </article>
+
+          <article class="card caveat hard" data-reveal>
+            <h4><span class="tagline">0600</span> 지문 MISMATCH 우회 금지</h4>
+            <p>지문 MISMATCH 를 우회하지 말 것. 매니페스트와 config 드롭인은 항상 0600.</p>
+          </article>
+
+          <article class="card caveat info" data-reveal>
+            <h4><span class="tagline">FROZEN</span> 런타임 산출물 이름은 고정</h4>
+            <ul class="frozen-list">
+              <li><code>~/.ssh/config.d/devx-delegations</code></li>
+              <li><code>~/.local/state/devx/ssh-delegations.log</code></li>
+              <li><code>DEVX_SSH_*</code> 환경변수</li>
+            </ul>
+          </article>
+
+          <article class="card caveat info" data-reveal style="grid-column: 1 / -1;">
+            <h4><span class="tagline">OPTIONAL</span> <code>yq</code> 는 선택이다</h4>
+            <p><code>yq</code> 는 선택이며 <code>doctor</code> 만 사용한다. 없으면 내장 awk 파서로 동작한다.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="wrap">
+        <p class="mono">devenv / ssh-delegate — docs/skill-guides/ssh-delegate.md</p>
+      </div>
+    </footer>
+
+  </main>
+
+  <script>
+    var vizMoonIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+    var vizSunIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>';
+
+    // === Menu ===
+    function toggleMenu() {
+      var dropdown = document.getElementById('vizMenuDropdown');
+      if (dropdown) dropdown.classList.toggle('open');
+    }
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.viz-menu')) {
+        var dropdown = document.getElementById('vizMenuDropdown');
+        if (dropdown) dropdown.classList.remove('open');
+      }
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        var dropdown = document.getElementById('vizMenuDropdown');
+        if (dropdown) dropdown.classList.remove('open');
+      }
+    });
+
+    // === Theme (class-based) ===
+    var savedTheme = localStorage.getItem('viz-theme');
+    var currentTheme = savedTheme || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    function applyTheme(t) {
+      document.documentElement.className = 'theme-' + t;
+      document.getElementById('themeIcon').innerHTML = t === 'dark' ? vizMoonIcon : vizSunIcon;
+      document.getElementById('themeLabel').textContent = t === 'dark' ? 'Dark' : 'Light';
+      localStorage.setItem('viz-theme', t);
+      currentTheme = t;
+    }
+    function cycleTheme() { applyTheme(currentTheme === 'dark' ? 'light' : 'dark'); }
+    applyTheme(currentTheme);
+
+    // === Scroll Reveal ===
+    document.querySelectorAll('[data-reveal]').forEach(function(el) { el.classList.add('reveal'); });
+    var revealObserver = new IntersectionObserver(function(entries) {
+      entries.forEach(function(e) { if (e.isIntersecting) { e.target.classList.add('visible'); revealObserver.unobserve(e.target); } });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach(function(el) { revealObserver.observe(el); });
+
+    // === Number Counter ===
+    function animateCounters() {
+      document.querySelectorAll('[data-count]').forEach(function(el) {
+        if (el.dataset.counted) return;
+        el.dataset.counted = '1';
+        var target = parseFloat(el.dataset.count), prefix = el.dataset.prefix || '', suffix = el.dataset.suffix || '';
+        var start = performance.now(), duration = 1100;
+        (function tick(now) {
+          var p = Math.min((now - start) / duration, 1), eased = 1 - Math.pow(1 - p, 3);
+          el.textContent = prefix + Math.round(target * eased).toLocaleString() + suffix;
+          if (p < 1) requestAnimationFrame(tick);
+        })(start);
+      });
+    }
+    var counterEl = document.querySelector('[data-count]');
+    if (counterEl) {
+      var cObs = new IntersectionObserver(function(entries) {
+        entries.forEach(function(e) { if (e.isIntersecting) { animateCounters(); cObs.disconnect(); } });
+      }, { threshold: 0.3 });
+      cObs.observe(counterEl);
+    }
+
+    // === INTERACTION 1: sub-command table filter ===
+    var subRows = document.querySelectorAll('#subTable tbody tr');
+    var filterBtns = document.querySelectorAll('.filter-btn');
+    function filterSub(key, btn) {
+      filterBtns.forEach(function(b) { b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'); });
+      subRows.forEach(function(row) {
+        var match = (key === 'all' || row.getAttribute('data-sub') === key);
+        row.classList.toggle('hidden-row', !match);
+      });
+    }
+
+    // === INTERACTION 2: copy invocation form ===
+    var copyResetTimer = null;
+    function copyInvocation() {
+      var btn = document.getElementById('copyBtn');
+      var text = '/devenv:ssh-delegate <sub-command> [args]';
+      var done = function() {
+        btn.textContent = '복사됨';
+        btn.classList.add('ok');
+        if (copyResetTimer) clearTimeout(copyResetTimer);
+        copyResetTimer = setTimeout(function() { btn.textContent = '복사'; btn.classList.remove('ok'); }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function() { done(); });
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (err) {}
+        document.body.removeChild(ta); done();
+      }
+    }
+
+    // === Download PNG ===
+    async function downloadImage() {
+      var menu = document.querySelector('.viz-menu');
+      menu.style.display = 'none';
+      try {
+        var url = await htmlToImage.toPng(document.body, { quality: 1, pixelRatio: 2, filter: function(n) { return !n.classList || !n.classList.contains('viz-menu'); } });
+        var a = document.createElement('a'); a.href = url;
+        a.download = document.title.replace(/\s+/g, '-').toLowerCase() + '.png'; a.click();
+      } catch (e) { console.error('Download failed:', e); }
+      menu.style.display = '';
+    }
+  </script>
+</body>
+</html>

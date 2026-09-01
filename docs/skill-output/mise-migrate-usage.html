@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="ko" class="theme-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mise-migrate 사용 결과</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { interpolate-size: allow-keywords; }
+
+    /* ===== THEMES (class-based ONLY) ===== */
+    html.theme-dark {
+      --bg: #0A0A0A; --surface: #141414; --surface-hover: #1C1C1C;
+      --border: rgba(255,255,255,0.08);
+      --text: #EDEDED; --text-secondary: #888;
+      --accent: #3b82f6; --accent-secondary: #8b5cf6;
+      --positive: #10b981; --negative: #f43f5e; --warning: #f59e0b;
+      --term-bg: #08090B;
+    }
+    html.theme-light {
+      --bg: #FAFAF9; --surface: #FFFFFF; --surface-hover: #F5F5F4;
+      --border: rgba(0,0,0,0.09);
+      --text: #0f172a; --text-secondary: #64748b;
+      --accent: #2563eb; --accent-secondary: #7c3aed;
+      --positive: #059669; --negative: #e11d48; --warning: #d97706;
+      --term-bg: #16181D;
+    }
+
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: 'Inter', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg); color: var(--text);
+      font-size: 17px; line-height: 1.7; -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.01em;
+      transition: background 0.3s, color 0.3s;
+      scrollbar-gutter: stable;
+      overflow-x: hidden;
+    }
+    h1,h2,h3,h4 { color: var(--text); letter-spacing: -0.03em; line-height: 1.12; text-wrap: balance; }
+    h1 { font-weight: 800; font-size: clamp(3rem, 8vw, 4.25rem); }
+    h2 { font-weight: 700; font-size: clamp(2rem, 5vw, 2.5rem); }
+    h3 { font-weight: 600; font-size: clamp(1.5rem, 3.6vw, 1.65rem); }
+    body, p, li, td, th, span, label { font-weight: 400; }
+    p,li,td,th,span,label { color: var(--text); }
+    .text-secondary { color: var(--text-secondary); }
+    code, kbd, pre, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+    .wrap { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+
+    /* ===== CARD ===== */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 24px;
+      transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+    .card:hover { box-shadow: 0 0 0 1px var(--border), 0 8px 16px rgba(0,0,0,0.08); }
+
+    /* ===== HEADER ===== */
+    header.hero { padding: 92px 0 40px; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 0.8rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--accent); border: 1px solid var(--border); background: var(--surface);
+      border-radius: 999px; padding: 6px 14px; margin-bottom: 20px;
+    }
+    .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--positive); }
+    .hero h1 .grad {
+      background: linear-gradient(100deg, var(--accent), var(--accent-secondary));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .hero-sub { margin-top: 16px; color: var(--text-secondary); font-size: 1.05rem; max-width: 62ch; }
+
+    /* ===== CALLOUT ===== */
+    .callout {
+      border: 1px solid var(--border); border-left: 4px solid var(--accent);
+      background: var(--surface); border-radius: 12px; padding: 22px 24px; margin-top: 32px;
+    }
+    .callout .label {
+      font-size: 0.78rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--accent); display: block; margin-bottom: 8px;
+    }
+    .callout p { font-size: 1.1rem; }
+
+    /* ===== PIPELINE FLOW ===== */
+    .flow {
+      display: flex; align-items: stretch; gap: 12px; margin-top: 28px; flex-wrap: wrap;
+    }
+    .flow-node {
+      flex: 1 1 200px; min-width: 0;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 20px 18px; text-align: center;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .flow-node:hover { transform: translateY(-3px); border-color: var(--accent); }
+    .flow-node .kind {
+      font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase;
+      font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 8px;
+    }
+    .flow-node .name { font-size: 1.02rem; font-weight: 600; word-break: break-word; }
+    .flow-node.mid { border-color: var(--accent); background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 12%, var(--surface)), var(--surface)); }
+    .flow-node.mid .name { color: var(--accent); font-family: 'JetBrains Mono', monospace; font-size: 0.98rem; }
+    .flow-node.out { border-color: var(--positive); }
+    .flow-arrow {
+      flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+      color: var(--text-secondary); font-size: 1.4rem; padding: 0 2px;
+    }
+    @media (max-width: 640px) {
+      .flow { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); padding: 2px 0; }
+    }
+
+    /* ===== STAT ROW ===== */
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 28px; }
+    .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 16px; }
+    .stat .k { font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-secondary); font-weight: 700; }
+    .stat .v { font-size: 1.9rem; font-weight: 800; margin-top: 6px; letter-spacing: -0.04em; font-family: 'JetBrains Mono', monospace; }
+    .stat.a .v { color: var(--accent); }
+    .stat.p .v { color: var(--positive); }
+    .stat.w .v { color: var(--warning); }
+
+    /* ===== SECTIONS ===== */
+    section { padding: 48px 0 8px; }
+    .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 8px; flex-wrap: wrap; }
+    .sec-num {
+      font-family: 'JetBrains Mono', monospace; font-size: 1.05rem; font-weight: 700;
+      color: var(--bg); background: var(--accent); border-radius: 8px;
+      width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+      flex: 0 0 auto; align-self: center;
+    }
+    .sec-note { color: var(--text-secondary); margin-bottom: 20px; }
+
+    /* ===== CODE / TERMINAL ===== */
+    pre.code, .terminal {
+      background: var(--term-bg); border: 1px solid var(--border); border-radius: 12px;
+      overflow-x: auto; font-size: 0.92rem; line-height: 1.75; color: #E6E6E6;
+    }
+    pre.code { padding: 18px 20px; }
+    pre.code .cmt { color: #7d8590; }
+    pre.code .cmd { color: #79c0ff; }
+    .terminal { padding: 0; }
+    .term-bar {
+      display: flex; align-items: center; gap: 7px; padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .term-bar i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+    .term-bar .t { margin-left: 8px; font-size: 0.78rem; color: #8b949e; font-family: 'JetBrains Mono', monospace; }
+    .term-body { padding: 18px 20px; overflow-x: auto; }
+    .term-body pre { font-size: 0.92rem; line-height: 1.85; white-space: pre; }
+    .term-body .ok { color: #3fb950; font-weight: 700; }
+    .term-body .plan { color: #79c0ff; }
+    .term-body .next { color: #d29922; }
+    .copy-btn {
+      margin-left: auto; background: transparent; border: 1px solid var(--border);
+      color: #8b949e; font: inherit; font-size: 0.75rem; padding: 3px 10px;
+      border-radius: 6px; cursor: pointer; transition: all 0.15s;
+    }
+    .copy-btn:hover { color: #E6E6E6; border-color: #8b949e; }
+
+    /* ===== TASK CHIPS ===== */
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .chip {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.88rem; font-weight: 500;
+      background: var(--surface-hover); border: 1px solid var(--border);
+      color: var(--text); border-radius: 8px; padding: 6px 12px;
+    }
+    .chip.off { color: var(--text-secondary); text-decoration: line-through; opacity: 0.7; }
+
+    /* ===== FINDINGS ===== */
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 18px; }
+    .filter {
+      font: inherit; font-size: 0.85rem; font-weight: 600;
+      background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary);
+      border-radius: 999px; padding: 7px 16px; cursor: pointer; transition: all 0.18s;
+    }
+    .filter:hover { background: var(--surface-hover); color: var(--text); }
+    .filter[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .findings { display: grid; gap: 12px; }
+    .finding {
+      background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--text-secondary);
+      border-radius: 12px; padding: 18px 20px;
+      transition: opacity 0.25s ease, transform 0.25s ease, box-shadow 0.2s ease;
+    }
+    .finding:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+    .finding[hidden] { display: none; }
+    .finding .tag {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; font-weight: 700;
+      letter-spacing: 0.04em; display: inline-block; margin-bottom: 6px;
+    }
+    .finding.k-task { border-left-color: var(--accent-secondary); }
+    .finding.k-task .tag { color: var(--accent-secondary); }
+    .finding.k-warn { border-left-color: var(--warning); }
+    .finding.k-warn .tag { color: var(--warning); }
+    .finding.k-info { border-left-color: var(--accent); }
+    .finding.k-info .tag { color: var(--accent); }
+    .finding.k-stale { border-left-color: var(--negative); }
+    .finding.k-stale .tag { color: var(--negative); }
+
+    /* inline code */
+    p code, li code, .finding code, .stat code, dd code, dt code {
+      font-size: 0.88em; background: var(--surface-hover); border: 1px solid var(--border);
+      border-radius: 5px; padding: 1px 6px; word-break: break-word;
+    }
+
+    /* ===== INPUT LIST ===== */
+    dl.files { display: grid; gap: 10px; margin-top: 18px; }
+    dl.files > div {
+      display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 4px 18px;
+      padding: 12px 0; border-top: 1px solid var(--border);
+    }
+    dl.files dt { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--accent); word-break: break-word; }
+    dl.files dd { color: var(--text-secondary); min-width: 0; }
+    @media (max-width: 640px) { dl.files > div { grid-template-columns: 1fr; } }
+
+    /* ===== VERIFY ===== */
+    .verify {
+      margin: 40px 0 0; border: 1px solid var(--border); border-left: 4px solid var(--positive);
+      background: var(--surface); border-radius: 12px; padding: 24px;
+    }
+    .verify .vh { display: flex; align-items: center; gap: 10px; color: var(--positive); font-weight: 700; font-size: 1.05rem; }
+    .verify .vh .mark {
+      width: 24px; height: 24px; border-radius: 50%; background: var(--positive); color: var(--bg);
+      display: inline-flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 900; flex: 0 0 auto;
+    }
+    .verify p { margin-top: 10px; }
+    .verify ul { margin: 12px 0 0 20px; }
+    .verify li { color: var(--text-secondary); margin-top: 4px; }
+
+    footer.foot { padding: 56px 0 72px; color: var(--text-secondary); font-size: 0.9rem; border-top: 1px solid var(--border); margin-top: 48px; }
+
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .animate { animation: fadeInUp 0.6s ease-out both; }
+    .animate.delay-1 { animation-delay: 0.1s; }
+    .animate.delay-2 { animation-delay: 0.2s; }
+    .animate.delay-3 { animation-delay: 0.3s; }
+    .animate.delay-4 { animation-delay: 0.4s; }
+    .animate.delay-5 { animation-delay: 0.5s; }
+    .animate.delay-6 { animation-delay: 0.6s; }
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .reveal { opacity: 1; transform: none; }
+    }
+
+    /* ===== PRINT ===== */
+    @media print {
+      body { background: white !important; color: black !important; font-size: 11pt; }
+      .viz-menu, .filters, .copy-btn { display: none !important; }
+      .reveal { display: revert; opacity: 1 !important; transform: none !important; }
+      .card, .finding, .verify, .flow-node { break-inside: avoid; border: 1px solid #ddd; box-shadow: none; }
+      .finding[hidden] { display: block !important; }
+      .terminal, pre.code { background: #f6f6f6 !important; color: #111 !important; }
+      * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+    @page { margin: 1in; }
+
+    /* ===== MENU ===== */
+    .viz-menu { position: fixed; top: 16px; right: 16px; z-index: 9999; }
+    .viz-menu-toggle {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); cursor: pointer; display: flex;
+      align-items: center; justify-content: center;
+      backdrop-filter: blur(12px); transition: all 0.2s;
+    }
+    .viz-menu-toggle:hover { background: var(--surface-hover); }
+    .viz-menu-dropdown {
+      position: absolute; top: 52px; right: 0; min-width: 200px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 8px;
+      opacity: 0; visibility: hidden; transform: translateY(-8px);
+      transition: all 0.2s; backdrop-filter: blur(16px);
+    }
+    .viz-menu-dropdown.open { opacity: 1; visibility: visible; transform: translateY(0); }
+    .viz-menu-dropdown button {
+      width: 100%; padding: 10px 14px; border: none; border-radius: 8px;
+      background: transparent; color: var(--text); font-size: 14px;
+      font-family: inherit; cursor: pointer; text-align: left;
+      display: flex; align-items: center; gap: 10px; transition: background 0.15s;
+    }
+    .viz-menu-dropdown button:hover { background: var(--surface-hover); }
+
+    /* ===== SKIP TO CONTENT ===== */
+    .skip-to-content {
+      position: absolute; top: -40px; left: 6px; background: var(--accent);
+      color: white; padding: 8px 12px; text-decoration: none;
+      border-radius: 4px; opacity: 0; pointer-events: none;
+      transition: all 0.2s; z-index: 10000;
+    }
+    .skip-to-content:focus { top: 6px; opacity: 1; pointer-events: auto; }
+
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-to-content">본문으로 건너뛰기</a>
+
+  <!-- MENU -->
+  <div class="viz-menu">
+    <button class="viz-menu-toggle" onclick="toggleMenu()" aria-label="메뉴 열기">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="15" x2="17" y2="15"/>
+      </svg>
+    </button>
+    <div class="viz-menu-dropdown" id="vizMenuDropdown">
+      <button onclick="cycleTheme()" aria-label="테마 전환"><span id="themeIcon" style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span><span id="themeLabel">Dark</span></button>
+      <button onclick="downloadImage()" aria-label="PNG 내려받기"><span style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span><span>Download PNG</span></button>
+      <button onclick="window.print()" aria-label="인쇄 또는 PDF 저장"><span style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></span><span>Print / PDF</span></button>
+    </div>
+  </div>
+
+  <main id="main-content" role="main">
+
+    <!-- HERO -->
+    <header class="hero">
+      <div class="wrap">
+        <span class="eyebrow animate"><span class="dot"></span>실행 기록 · dry-run</span>
+        <h1 class="animate delay-1"><span class="grad">mise-migrate</span><br>사용 결과</h1>
+        <p class="hero-sub animate delay-2">legacy venv/pip 프로젝트 한 건을 <code>/devenv:mise-migrate</code> 로 통과시킨 실제 실행의 기록.</p>
+
+        <div class="callout animate delay-3">
+          <span class="label">한 줄 요약</span>
+          <p>legacy venv/pip 프로젝트를 받아 마이그레이션 플랜 4종(mise.toml, pyproject diff, 정리 목록, stale 참조 스캔)을 생성합니다.</p>
+        </div>
+
+        <!-- PIPELINE -->
+        <div class="flow animate delay-4" role="img" aria-label="파이프라인: legacy 프로젝트에서 devenv mise-migrate 를 거쳐 마이그레이션 플랜(dry-run)으로">
+          <div class="flow-node">
+            <span class="kind">입력</span>
+            <span class="name">legacy 프로젝트</span>
+          </div>
+          <div class="flow-arrow" aria-hidden="true">▶</div>
+          <div class="flow-node mid">
+            <span class="kind">스킬</span>
+            <span class="name">/devenv:mise-migrate</span>
+          </div>
+          <div class="flow-arrow" aria-hidden="true">▶</div>
+          <div class="flow-node out">
+            <span class="kind">산출물</span>
+            <span class="name">마이그레이션 플랜 (dry-run)</span>
+          </div>
+        </div>
+
+        <!-- STATS -->
+        <div class="stats animate delay-5">
+          <div class="stat a"><div class="k">backend</div><div class="v">hatchling</div></div>
+          <div class="stat a"><div class="k">py</div><div class="v">3.11</div></div>
+          <div class="stat p"><div class="k">tasks</div><div class="v" data-count="6">6</div></div>
+          <div class="stat w"><div class="k">stale</div><div class="v" data-count="6">6</div></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- 1. 실행한 명령 -->
+    <section id="sec-command" data-reveal aria-labelledby="h-command">
+      <div class="wrap">
+        <div class="sec-head"><span class="sec-num">1</span><h2 id="h-command">실행한 명령</h2></div>
+        <p class="sec-note">플래그가 없으면 dry-run 이 기본이다.</p>
+        <div class="terminal">
+          <div class="term-bar">
+            <i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i>
+            <span class="t">invocation</span>
+            <button class="copy-btn" onclick="copyCmd(this)" aria-label="명령 복사">copy</button>
+          </div>
+          <div class="term-body">
+<pre id="cmd-block"><span class="cmd">/devenv:mise-migrate</span> [path] [--apply]          <span class="cmt"># 범용 형식</span>
+<span class="cmd">/devenv:mise-migrate</span> $SANDBOX/legacy-proj      <span class="cmt"># 이번 실행 (플래그 없음 = dry-run)</span></pre>
+          </div>
+        </div>
+        <p class="sec-note" style="margin-top:16px;"><code>SANDBOX=/tmp/claude-1000/.../scratchpad</code> (세션 스크래치패드)</p>
+      </div>
+    </section>
+
+    <!-- 2. 입력 -->
+    <section id="sec-input" data-reveal aria-labelledby="h-input">
+      <div class="wrap">
+        <div class="sec-head"><span class="sec-num">2</span><h2 id="h-input">입력</h2></div>
+        <p class="sec-note"><code>$SANDBOX/legacy-proj</code> — setuptools 백엔드 + src 레이아웃의 <code>acmecli</code> 샘플.</p>
+        <div class="card">
+          <dl class="files">
+            <div>
+              <dt>pyproject.toml</dt>
+              <dd><code>requires-python = "&gt;=3.11"</code>, <code>[tool.ruff]</code>, <code>[tool.pytest.ini_options]</code>, <code>optional-dependencies.dev</code></dd>
+            </div>
+            <div>
+              <dt>requirements.txt</dt>
+              <dd>런타임 의존성</dd>
+            </div>
+            <div>
+              <dt>requirements-dev.txt</dt>
+              <dd>개발 의존성</dd>
+            </div>
+            <div>
+              <dt>.venv/</dt>
+              <dd>pyvenv.cfg 없는 빈 디렉터리</dd>
+            </div>
+            <div>
+              <dt>src/acmecli.egg-info/</dt>
+              <dd>setuptools 빌드 잔재</dd>
+            </div>
+            <div>
+              <dt>README.md</dt>
+              <dd>옛 venv 워크플로를 안내</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. 결과 -->
+    <section id="sec-result" data-reveal aria-labelledby="h-result">
+      <div class="wrap">
+        <div class="sec-head"><span class="sec-num">3</span><h2 id="h-result">결과</h2></div>
+        <p class="sec-note">스킬이 출력한 그대로.</p>
+
+        <div class="terminal">
+          <div class="term-bar">
+            <i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i>
+            <span class="t">output</span>
+          </div>
+          <div class="term-body">
+<pre><span class="plan">Plan ready: $SANDBOX/legacy-proj (backend=hatchling, py=3.11, tasks=6, stale=6)</span>
+<span class="ok">[OK]</span> devenv:mise-migrate path=$SANDBOX/legacy-proj backend=hatchling py=3.11 tasks=6
+<span class="next">Next:</span> review the plan, then re-run with --apply</pre>
+          </div>
+        </div>
+
+        <h3 style="margin-top:40px;">플랜이 말한 것</h3>
+        <div class="filters" role="group" aria-label="결과 항목 필터">
+          <button class="filter" data-filter="all" aria-pressed="true" onclick="setFilter(this)">전체</button>
+          <button class="filter" data-filter="task" aria-pressed="false" onclick="setFilter(this)">tasks</button>
+          <button class="filter" data-filter="warn" aria-pressed="false" onclick="setFilter(this)">[WARN]</button>
+          <button class="filter" data-filter="info" aria-pressed="false" onclick="setFilter(this)">[INFO]</button>
+          <button class="filter" data-filter="stale" aria-pressed="false" onclick="setFilter(this)">stale</button>
+        </div>
+
+        <div class="findings" id="findings">
+          <article class="finding k-task" data-kind="task">
+            <span class="tag">TASKS · 6</span>
+            <p>task 6개 — <code>lint</code> <code>lint-py</code> <code>test</code> <code>fix</code> <code>fix-py</code> <code>run</code>. mypy 는 설정에 없어 제외되고 ruff 만 반영됐다.</p>
+            <div class="chips">
+              <span class="chip">lint</span>
+              <span class="chip">lint-py</span>
+              <span class="chip">test</span>
+              <span class="chip">fix</span>
+              <span class="chip">fix-py</span>
+              <span class="chip">run</span>
+              <span class="chip off">mypy</span>
+            </div>
+          </article>
+
+          <article class="finding k-warn" data-kind="warn">
+            <span class="tag">[WARN]</span>
+            <p>dev 의존성이 PEP 735 <code>[dependency-groups]</code> 로 올라가 <code>pip install -e ".[dev]"</code> 가 무음 실패하게 됨 (<code>README.md:8</code> 에서 실제 검출).</p>
+          </article>
+
+          <article class="finding k-info" data-kind="info">
+            <span class="tag">[INFO]</span>
+            <p><code>pyvenv.cfg</code> 부재로 python pin 은 <code>requires-python</code> 하한 3.11.</p>
+          </article>
+
+          <article class="finding k-stale" data-kind="stale">
+            <span class="tag">STALE · 6</span>
+            <p>stale 참조 6건 — <code>README.md:6,7,8</code> / <code>pyproject.toml:2,3,23</code>. 제외 0건.</p>
+          </article>
+        </div>
+
+        <!-- VERIFICATION -->
+        <div class="verify" data-reveal>
+          <div class="vh"><span class="mark" aria-hidden="true">✓</span><span>dry-run 이라 아무것도 쓰이지 않았다</span></div>
+          <p><code>mise.toml</code> 은 생성되지 않았고 <code>pyproject.toml</code>·<code>README.md</code> 의 md5 와 <code>.venv/</code>, <code>src/acmecli.egg-info/</code> 는 실행 전과 동일했다.</p>
+          <ul>
+            <li><code>mise.toml</code> — 미생성</li>
+            <li><code>pyproject.toml</code> · <code>README.md</code> — md5 동일</li>
+            <li><code>.venv/</code> · <code>src/acmecli.egg-info/</code> — 실행 전과 동일</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <div class="wrap">
+        <p>출처: <code>docs/skill-output/mise-migrate-usage.md</code> — devenv 플러그인 <code>mise-migrate</code> 스킬 실행 기록.</p>
+      </div>
+    </footer>
+
+  </main>
+
+  <script>
+    var vizMoonIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+    var vizSunIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>';
+
+    // === Menu ===
+    function toggleMenu() {
+      var dropdown = document.getElementById('vizMenuDropdown');
+      if (dropdown) dropdown.classList.toggle('open');
+    }
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('.viz-menu')) {
+        var dropdown = document.getElementById('vizMenuDropdown');
+        if (dropdown) dropdown.classList.remove('open');
+      }
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        var dropdown = document.getElementById('vizMenuDropdown');
+        if (dropdown) dropdown.classList.remove('open');
+      }
+    });
+
+    // === Theme (class-based) ===
+    var savedTheme = localStorage.getItem('viz-theme');
+    var currentTheme = savedTheme || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    function applyTheme(t) {
+      document.documentElement.className = 'theme-' + t;
+      document.getElementById('themeIcon').innerHTML = t === 'dark' ? vizMoonIcon : vizSunIcon;
+      document.getElementById('themeLabel').textContent = t === 'dark' ? 'Dark' : 'Light';
+      localStorage.setItem('viz-theme', t);
+      currentTheme = t;
+    }
+    function cycleTheme() { applyTheme(currentTheme === 'dark' ? 'light' : 'dark'); }
+    applyTheme(currentTheme);
+
+    // === Scroll Reveal ===
+    document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('reveal'); });
+    var revealObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('visible'); revealObserver.unobserve(e.target); }
+      });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach(function (el) { revealObserver.observe(el); });
+
+    // === Number Counters (values stay exactly as recorded) ===
+    function animateCounters() {
+      document.querySelectorAll('[data-count]').forEach(function (el) {
+        if (el.dataset.counted) return;
+        el.dataset.counted = '1';
+        var target = parseFloat(el.dataset.count), prefix = el.dataset.prefix || '', suffix = el.dataset.suffix || '';
+        var start = performance.now(), duration = 900;
+        (function tick(now) {
+          var p = Math.min((now - start) / duration, 1), eased = 1 - Math.pow(1 - p, 3);
+          el.textContent = prefix + Math.round(target * eased).toLocaleString() + suffix;
+          if (p < 1) requestAnimationFrame(tick);
+          else el.textContent = prefix + target + suffix;
+        })(start);
+      });
+    }
+    var counterEl = document.querySelector('[data-count]');
+    if (counterEl) {
+      var cObs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) { if (e.isIntersecting) { animateCounters(); cObs.disconnect(); } });
+      }, { threshold: 0.3 });
+      cObs.observe(counterEl);
+    }
+
+    // === Interaction: findings filter ===
+    var findingEls = document.querySelectorAll('#findings .finding');
+    function setFilter(btn) {
+      var kind = btn.dataset.filter;
+      document.querySelectorAll('.filter').forEach(function (b) {
+        b.setAttribute('aria-pressed', String(b === btn));
+      });
+      findingEls.forEach(function (el) {
+        el.hidden = !(kind === 'all' || el.dataset.kind === kind);
+      });
+    }
+
+    // === Interaction: copy the invocation ===
+    function copyCmd(btn) {
+      var text = document.getElementById('cmd-block').innerText;
+      navigator.clipboard.writeText(text).then(function () {
+        btn.textContent = 'copied';
+        setTimeout(function () { btn.textContent = 'copy'; }, 1400);
+      }).catch(function () { btn.textContent = 'failed'; });
+    }
+
+    // === Download PNG ===
+    async function downloadImage() {
+      var menu = document.querySelector('.viz-menu');
+      menu.style.display = 'none';
+      try {
+        var url = await htmlToImage.toPng(document.body, {
+          quality: 1, pixelRatio: 2,
+          filter: function (n) { return !n.classList || !n.classList.contains('viz-menu'); }
+        });
+        var a = document.createElement('a'); a.href = url;
+        a.download = 'mise-migrate-usage.png'; a.click();
+      } catch (e) { console.error('Download failed:', e); }
+      menu.style.display = '';
+    }
+  </script>
+</body>
+</html>

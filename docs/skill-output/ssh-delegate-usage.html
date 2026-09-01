@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ko" class="theme-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ssh-delegate 사용 결과</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { interpolate-size: allow-keywords; }
+
+    /* ===== THEMES (class-based ONLY) ===== */
+    html.theme-dark {
+      --bg: #0A0A0A; --surface: #141414; --surface-hover: #1C1C1C;
+      --border: rgba(255,255,255,0.08);
+      --text: #EDEDED; --text-secondary: #8A8A8A;
+      --accent: #3b82f6; --accent-secondary: #8b5cf6;
+      --positive: #10b981; --negative: #f43f5e; --warning: #f59e0b;
+      --term-bg: #0D0D0D;
+    }
+    html.theme-light {
+      --bg: #FAFAF9; --surface: #FFFFFF; --surface-hover: #F5F5F4;
+      --border: rgba(0,0,0,0.10);
+      --text: #0f172a; --text-secondary: #5b6474;
+      --accent: #2563eb; --accent-secondary: #7c3aed;
+      --positive: #047857; --negative: #e11d48; --warning: #b45309;
+      --term-bg: #F4F4F2;
+    }
+
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: 'Inter', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg); color: var(--text);
+      font-size: 17px; line-height: 1.7; -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.01em;
+      transition: background 0.3s, color 0.3s;
+      scrollbar-gutter: stable;
+      overflow-x: hidden;
+    }
+    h1,h2,h3,h4 { color: var(--text); letter-spacing: -0.03em; line-height: 1.12; text-wrap: balance; overflow-wrap: break-word; }
+    h1 { font-weight: 800; font-size: clamp(3rem, 8vw, 4.4rem); }
+    h2 { font-weight: 700; font-size: clamp(2rem, 5vw, 2.6rem); }
+    h3 { font-weight: 600; font-size: clamp(1.5rem, 3.6vw, 1.7rem); }
+    p, li, td, th, span, label { color: var(--text); font-weight: 400; }
+    .text-secondary { color: var(--text-secondary); }
+    code, pre, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+    .wrap { max-width: 940px; margin: 0 auto; padding: 0 20px; }
+    section { padding: 56px 0 8px; }
+
+    /* ===== CARD ===== */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 24px;
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    .card:hover { box-shadow: 0 0 0 1px var(--border), 0 10px 22px rgba(0,0,0,0.10); transform: translateY(-2px); }
+
+    /* ===== HERO ===== */
+    header.hero { padding: 88px 0 8px; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 0.82rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--accent); border: 1px solid var(--border); background: var(--surface);
+      border-radius: 999px; padding: 6px 14px;
+    }
+    .hero h1 { margin: 20px 0 0; }
+    .hero .sub { margin-top: 14px; font-size: 1.15rem; color: var(--text-secondary); max-width: 46ch; }
+
+    /* ===== CALLOUT ===== */
+    .callout {
+      margin-top: 34px; background: var(--surface);
+      border: 1px solid var(--border); border-left: 4px solid var(--accent);
+      border-radius: 12px; padding: 22px 24px;
+    }
+    .callout .label {
+      font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--accent); display: block; margin-bottom: 8px;
+    }
+    .callout p { font-size: 1.2rem; font-weight: 500; line-height: 1.55; }
+
+    /* ===== PIPELINE ===== */
+    .pipeline {
+      margin-top: 34px; display: flex; align-items: stretch; gap: 14px;
+      flex-wrap: nowrap;
+    }
+    .pipe-node {
+      flex: 1 1 0; min-width: 0;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 18px 16px; text-align: center;
+      display: flex; flex-direction: column; justify-content: center; gap: 6px;
+    }
+    .pipe-node .n-kicker { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-secondary); font-weight: 700; }
+    .pipe-node .n-title { font-size: 1rem; font-weight: 600; overflow-wrap: break-word; }
+    .pipe-node.is-skill { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+    .pipe-node.is-skill .n-title { color: var(--accent); font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; }
+    .pipe-arrow {
+      flex: 0 0 auto; align-self: center; color: var(--text-secondary);
+      font-size: 1.4rem; line-height: 1; font-weight: 700;
+    }
+
+    /* ===== COMMAND CARDS ===== */
+    .cmd-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 22px; }
+    .cmd-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; transition: border-color .2s, transform .2s; }
+    .cmd-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .cmd-card .run-no { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-secondary); }
+    .cmd-card .cmd { display: block; margin-top: 8px; font-size: 0.9rem; color: var(--text); overflow-wrap: anywhere; line-height: 1.5; }
+    .cmd-card .cmd b { color: var(--accent); font-weight: 700; }
+
+    .codeblock {
+      background: var(--term-bg); border: 1px solid var(--border); border-radius: 12px;
+      padding: 18px 20px; overflow-x: auto; margin-top: 20px;
+    }
+    .codeblock pre { font-size: 0.92rem; line-height: 1.75; white-space: pre; }
+    .codeblock .cmt { color: var(--text-secondary); }
+
+    /* ===== NOTES ===== */
+    .note { margin-top: 20px; display: flex; gap: 14px; align-items: flex-start;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+    .note .dot { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; margin-top: 10px; background: var(--warning); }
+    .note.ok .dot { background: var(--positive); }
+    .note p { font-size: 1rem; }
+    .note code { font-size: 0.88em; color: var(--accent); overflow-wrap: anywhere; }
+
+    /* ===== TABS ===== */
+    .tabs { margin-top: 24px; }
+    .tablist { display: flex; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+    .tab {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.88rem; font-weight: 500;
+      background: var(--surface); color: var(--text-secondary);
+      border: 1px solid var(--border); border-radius: 999px; padding: 9px 16px;
+      cursor: pointer; transition: all .18s; overflow-wrap: anywhere; max-width: 100%;
+    }
+    .tab:hover { background: var(--surface-hover); color: var(--text); }
+    .tab[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+    .tab:focus-visible { outline: 2px solid var(--accent-secondary); outline-offset: 2px; }
+    .tabpanel { padding-top: 22px; animation: fadeIn .35s ease-out both; }
+    .tabpanel[hidden] { display: none; }
+    .exit-badge {
+      display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; font-weight: 700;
+      color: var(--positive); border: 1px solid var(--positive); border-radius: 6px; padding: 3px 9px;
+    }
+    .panel-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .panel-head .pcmd { font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
+
+    /* ===== TERMINAL ===== */
+    .terminal { margin-top: 18px; background: var(--term-bg); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .term-bar { display: flex; align-items: center; gap: 7px; padding: 11px 16px; border-bottom: 1px solid var(--border); }
+    .term-bar i { width: 11px; height: 11px; border-radius: 50%; background: var(--border); display: block; }
+    .term-bar i:nth-child(1) { background: var(--negative); }
+    .term-bar i:nth-child(2) { background: var(--warning); }
+    .term-bar i:nth-child(3) { background: var(--positive); }
+    .term-bar span { margin-left: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text-secondary); }
+    .term-body { padding: 18px 20px; overflow-x: auto; }
+    .term-body pre { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; line-height: 1.85; white-space: pre; }
+    .tok-ok { color: var(--positive); font-weight: 700; }
+    .tok-pend { color: var(--text-secondary); font-weight: 700; }
+    .tok-head { color: var(--accent-secondary); font-weight: 700; }
+
+    .steps { margin-top: 16px; list-style: none; display: grid; gap: 10px; }
+    .steps li { display: flex; gap: 12px; align-items: flex-start; font-size: 1rem; }
+    .steps li::before { content: "would"; flex: 0 0 auto; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+      font-weight: 700; color: var(--warning); border: 1px solid var(--warning); border-radius: 5px; padding: 2px 7px; margin-top: 5px; }
+    .steps li code { font-size: 0.88em; color: var(--accent); overflow-wrap: anywhere; }
+
+    .empty-table { margin-top: 18px; width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }
+    .empty-table th { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text-secondary); font-weight: 700; }
+    .empty-table td { padding: 18px 12px; color: var(--text-secondary); }
+
+    /* ===== VERDICT ===== */
+    .verdict {
+      margin: 40px 0 0; background: var(--surface);
+      border: 1px solid var(--positive); border-radius: 14px; padding: 26px 28px;
+      display: flex; gap: 18px; align-items: flex-start;
+    }
+    .verdict .check { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%;
+      background: var(--positive); color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 1.1rem; }
+    .verdict h3 { color: var(--positive); font-size: 1.5rem; }
+    .verdict p { margin-top: 8px; font-size: 1.02rem; }
+    .verdict code { color: var(--accent); font-size: 0.9em; overflow-wrap: anywhere; }
+
+    footer.foot { padding: 56px 0 72px; color: var(--text-secondary); font-size: 0.9rem; border-top: 1px solid var(--border); margin-top: 48px; }
+
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .animate { animation: fadeInUp 0.6s ease-out both; }
+    .animate.delay-1 { animation-delay: 0.1s; }
+    .animate.delay-2 { animation-delay: 0.2s; }
+    .animate.delay-3 { animation-delay: 0.3s; }
+    .animate.delay-4 { animation-delay: 0.4s; }
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .reveal { opacity: 1; transform: none; }
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 760px) {
+      .cmd-grid { grid-template-columns: 1fr; }
+      .pipeline { flex-direction: column; }
+      .pipe-arrow { transform: rotate(90deg); }
+      section { padding: 44px 0 4px; }
+      header.hero { padding: 64px 0 4px; }
+      .wrap { padding: 0 16px; }
+      .verdict { flex-direction: column; gap: 12px; }
+    }
+
+    /* ===== PRINT ===== */
+    @media print {
+      body { background: white !important; color: black !important; }
+      .viz-menu { display: none !important; }
+      .reveal { display: revert; opacity: 1 !important; transform: none !important; }
+      .card, .cmd-card, .terminal, .callout, .verdict { break-inside: avoid; border: 1px solid #ddd; box-shadow: none; }
+      .tabpanel[hidden] { display: block !important; }
+      .tablist { display: none; }
+      * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+    @page { margin: 1in; }
+
+    /* ===== MENU ===== */
+    .viz-menu { position: fixed; top: 16px; right: 16px; z-index: 9999; }
+    .viz-menu-toggle {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); cursor: pointer; display: flex;
+      align-items: center; justify-content: center;
+      backdrop-filter: blur(12px); transition: all 0.2s;
+    }
+    .viz-menu-toggle:hover { background: var(--surface-hover); }
+    .viz-menu-dropdown {
+      position: absolute; top: 52px; right: 0; min-width: 200px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 8px;
+      opacity: 0; visibility: hidden; transform: translateY(-8px);
+      transition: all 0.2s; backdrop-filter: blur(16px);
+    }
+    .viz-menu-dropdown.open { opacity: 1; visibility: visible; transform: translateY(0); }
+    .viz-menu-dropdown button {
+      width: 100%; padding: 10px 14px; border: none; border-radius: 8px;
+      background: transparent; color: var(--text); font-size: 14px;
+      font-family: inherit; cursor: pointer; text-align: left;
+      display: flex; align-items: center; gap: 10px; transition: background 0.15s;
+    }
+    .viz-menu-dropdown button:hover { background: var(--surface-hover); }
+
+    /* ===== SKIP TO CONTENT ===== */
+    .skip-to-content {
+      position: absolute; top: -40px; left: 6px; background: var(--accent);
+      color: white; padding: 8px 12px; text-decoration: none;
+      border-radius: 4px; opacity: 0; pointer-events: none;
+      transition: all 0.2s; z-index: 10000;
+    }
+    .skip-to-content:focus { top: 6px; opacity: 1; pointer-events: auto; }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-to-content">본문으로 건너뛰기</a>
+
+  <!-- MENU -->
+  <div class="viz-menu">
+    <button class="viz-menu-toggle" onclick="toggleMenu()" aria-label="메뉴 열기">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="15" x2="17" y2="15"/>
+      </svg>
+    </button>
+    <div class="viz-menu-dropdown" id="vizMenuDropdown">
+      <button onclick="cycleTheme()" aria-label="테마 전환"><span id="themeIcon" style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span><span id="themeLabel">Dark</span></button>
+      <button onclick="downloadImage()" aria-label="PNG 다운로드"><span style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span><span>Download PNG</span></button>
+      <button onclick="window.print()" aria-label="인쇄"><span style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></span><span>Print / PDF</span></button>
+    </div>
+  </div>
+
+  <main id="main-content">
+
+    <header class="hero wrap">
+      <span class="eyebrow animate">실행 기록 · Run Report</span>
+      <h1 class="animate delay-1">ssh-delegate<br>사용 결과</h1>
+      <p class="sub animate delay-2">읽기 전용 경로만 골라 실행한 샌드박스 검증 1회분의 기록.</p>
+
+      <div class="callout animate delay-3">
+        <span class="label">한 줄 요약</span>
+        <p>서브커맨드와 매니페스트를 받아 위임 상태 진단과 실행 계획을 생성합니다.</p>
+      </div>
+
+      <div class="pipeline animate delay-4" role="img" aria-label="파이프라인: 서브커맨드와 매니페스트가 devenv ssh-delegate 스킬로 들어가 진단 및 계획 출력을 만든다">
+        <div class="pipe-node">
+          <span class="n-kicker">입력</span>
+          <span class="n-title">서브커맨드 + 매니페스트</span>
+        </div>
+        <div class="pipe-arrow" aria-hidden="true">▶</div>
+        <div class="pipe-node is-skill">
+          <span class="n-kicker">스킬</span>
+          <span class="n-title">/devenv:ssh-delegate</span>
+        </div>
+        <div class="pipe-arrow" aria-hidden="true">▶</div>
+        <div class="pipe-node">
+          <span class="n-kicker">출력</span>
+          <span class="n-title">진단 / 계획 출력</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="wrap" data-reveal aria-labelledby="h-cmd">
+      <h2 id="h-cmd">1. 실행한 명령</h2>
+
+      <div class="codeblock">
+        <pre>/devenv:ssh-delegate &lt;sync|add|list|test|revoke|doctor&gt;     <span class="cmt"># 범용 형식</span></pre>
+      </div>
+
+      <div class="cmd-grid">
+        <div class="cmd-card">
+          <span class="run-no">이번 실행 1</span>
+          <code class="cmd">/devenv:ssh-delegate <b>doctor</b></code>
+        </div>
+        <div class="cmd-card">
+          <span class="run-no">이번 실행 2</span>
+          <code class="cmd">/devenv:ssh-delegate <b>add</b> deploy@example.invalid demo --dry-run</code>
+        </div>
+        <div class="cmd-card">
+          <span class="run-no">이번 실행 3</span>
+          <code class="cmd">/devenv:ssh-delegate <b>list</b></code>
+        </div>
+      </div>
+
+      <div class="note">
+        <span class="dot" aria-hidden="true"></span>
+        <p>원격에 키를 설치·삭제하지 않는 <strong>읽기 전용 경로만</strong> 실행했고,
+        <code>DEVX_SSH_MANIFEST</code> / <code>DEVX_SSH_AUDIT_LOG</code> /
+        <code>DEVX_SSH_CONFIG_DROPIN</code> 로 샌드박스를 가리켰다.</p>
+      </div>
+    </section>
+
+    <section class="wrap" data-reveal aria-labelledby="h-input">
+      <h2 id="h-input">2. 입력</h2>
+      <div class="card" style="margin-top:22px;">
+        <p>매니페스트가 아직 없는 <strong>빈 샌드박스</strong>. 기본 identity 는 실제 환경의
+        <code style="color:var(--accent);">~/.ssh/id_ed25519</code>.</p>
+      </div>
+    </section>
+
+    <section class="wrap" data-reveal aria-labelledby="h-result">
+      <h2 id="h-result">3. 결과</h2>
+      <p class="text-secondary" style="margin-top:10px;">탭을 눌러 각 서브커맨드의 결과를 확인하세요.</p>
+
+      <div class="tabs">
+        <div class="tablist" role="tablist" aria-label="서브커맨드별 결과">
+          <button class="tab" role="tab" id="tab-doctor" aria-controls="panel-doctor" aria-selected="true" onclick="selectTab('doctor')">doctor</button>
+          <button class="tab" role="tab" id="tab-add" aria-controls="panel-add" aria-selected="false" tabindex="-1" onclick="selectTab('add')">add --dry-run</button>
+          <button class="tab" role="tab" id="tab-list" aria-controls="panel-list" aria-selected="false" tabindex="-1" onclick="selectTab('list')">list</button>
+        </div>
+
+        <div class="tabpanel" role="tabpanel" id="panel-doctor" aria-labelledby="tab-doctor">
+          <div class="panel-head">
+            <span class="pcmd">doctor</span>
+            <span class="exit-badge">exit 0</span>
+          </div>
+          <div class="terminal">
+            <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><span>terminal output — verbatim</span></div>
+            <div class="term-body">
+<pre><span class="tok-head">== doctor ==</span>
+<span class="tok-pend">[..]</span> no manifest yet (...delegations.yml) — run `add` to create one
+<span class="tok-ok">[OK]</span> default identity present (/home/bwyoon/.ssh/id_ed25519)
+<span class="tok-ok">[OK]</span> ssh present
+<span class="tok-pend">[..]</span> yq absent — using built-in awk parser (OK)
+<span class="tok-ok">[OK]</span> audit log writable (...ssh-delegations.log)</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabpanel" role="tabpanel" id="panel-add" aria-labelledby="tab-add" hidden>
+          <div class="panel-head">
+            <span class="pcmd">add deploy@example.invalid demo --dry-run</span>
+            <span class="exit-badge">exit 0</span>
+          </div>
+          <p style="margin-top:14px;">다음 세 가지를 <strong>"would" 로만</strong> 출력했다. 실제로 수행된 것은 없다.</p>
+          <ul class="steps">
+            <li>매니페스트 upsert</li>
+            <li><code>ssh-copy-id -i "~/.ssh/id_ed25519.pub" -p 22 deploy@example.invalid</code></li>
+            <li>config 재생성 + verify</li>
+          </ul>
+        </div>
+
+        <div class="tabpanel" role="tabpanel" id="panel-list" aria-labelledby="tab-list" hidden>
+          <div class="panel-head">
+            <span class="pcmd">list</span>
+          </div>
+          <p style="margin-top:14px;">헤더만 있는 빈 표를 냈다.</p>
+          <table class="empty-table">
+            <thead><tr><th scope="col">alias</th><th scope="col">host</th><th scope="col">status</th></tr></thead>
+            <tbody><tr><td colspan="3">— 항목 없음 —</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="verdict" data-reveal>
+        <span class="check" aria-hidden="true">✓</span>
+        <div>
+          <h3>delegations.yml 은 생성되지 않았다</h3>
+          <p>실행 후 샌드박스에는 <code>state/</code> 만 남았다 —
+          <code>--dry-run</code> 이 원격은 물론 <strong>로컬 매니페스트도 건드리지 않음</strong>이 확인됐다.</p>
+        </div>
+      </div>
+    </section>
+
+    <footer class="foot wrap">
+      <p>devenv-skills · ssh-delegate 실행 기록. 인용된 터미널 출력은 실제 실행 결과 그대로다.</p>
+    </footer>
+
+  </main>
+
+  <script>
+    var vizMoonIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+    var vizSunIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>';
+
+    // === Menu ===
+    function toggleMenu() {
+      var dropdown = document.getElementById('vizMenuDropdown');
+      if (dropdown) dropdown.classList.toggle('open');
+    }
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.viz-menu')) {
+        var dropdown = document.getElementById('vizMenuDropdown');
+        if (dropdown) dropdown.classList.remove('open');
+      }
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        var dropdown = document.getElementById('vizMenuDropdown');
+        if (dropdown) dropdown.classList.remove('open');
+      }
+    });
+
+    // === Theme (class-based) ===
+    var savedTheme = localStorage.getItem('viz-theme');
+    var currentTheme = savedTheme || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    function applyTheme(t) {
+      document.documentElement.className = 'theme-' + t;
+      document.getElementById('themeIcon').innerHTML = t === 'dark' ? vizMoonIcon : vizSunIcon;
+      document.getElementById('themeLabel').textContent = t === 'dark' ? 'Dark' : 'Light';
+      localStorage.setItem('viz-theme', t);
+      currentTheme = t;
+    }
+    function cycleTheme() { applyTheme(currentTheme === 'dark' ? 'light' : 'dark'); }
+    applyTheme(currentTheme);
+
+    // === Tabs (meaningful interaction) ===
+    var tabIds = ['doctor', 'add', 'list'];
+    function selectTab(name) {
+      tabIds.forEach(function(id) {
+        var btn = document.getElementById('tab-' + id);
+        var panel = document.getElementById('panel-' + id);
+        var on = (id === name);
+        btn.setAttribute('aria-selected', on ? 'true' : 'false');
+        btn.tabIndex = on ? 0 : -1;
+        panel.hidden = !on;
+      });
+    }
+    document.querySelector('.tablist').addEventListener('keydown', function(e) {
+      var i = tabIds.indexOf(document.activeElement.id.replace('tab-', ''));
+      if (i < 0) return;
+      var next = -1;
+      if (e.key === 'ArrowRight') next = (i + 1) % tabIds.length;
+      if (e.key === 'ArrowLeft') next = (i - 1 + tabIds.length) % tabIds.length;
+      if (next < 0) return;
+      e.preventDefault();
+      selectTab(tabIds[next]);
+      document.getElementById('tab-' + tabIds[next]).focus();
+    });
+
+    // === Scroll Reveal ===
+    document.querySelectorAll('[data-reveal]').forEach(function(el) { el.classList.add('reveal'); });
+    var revealObserver = new IntersectionObserver(function(entries) {
+      entries.forEach(function(e) { if (e.isIntersecting) { e.target.classList.add('visible'); revealObserver.unobserve(e.target); } });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach(function(el) { revealObserver.observe(el); });
+
+    // === Download PNG ===
+    async function downloadImage() {
+      var menu = document.querySelector('.viz-menu');
+      menu.style.display = 'none';
+      try {
+        var url = await htmlToImage.toPng(document.body, { quality: 1, pixelRatio: 2, filter: function(n) { return !n.classList || !n.classList.contains('viz-menu'); } });
+        var a = document.createElement('a'); a.href = url;
+        a.download = 'ssh-delegate-usage.png'; a.click();
+      } catch (e) { console.error('Download failed:', e); }
+      menu.style.display = '';
+    }
+  </script>
+</body>
+</html>
