@@ -1,0 +1,84 @@
+[
+  {
+    "query": "/devenv:mise-migrate ./tools/log-parser --apply",
+    "should_trigger": true,
+    "note": "slash-literal: update if the skill is renamed (#1410)"
+  },
+  {
+    "query": "/devenv-mise-migrate 로 먼저 계획만 뽑아서 보여줘",
+    "should_trigger": true,
+    "note": "slash-literal: update if the skill is renamed (#1410)"
+  },
+  {
+    "query": "이 레포는 아직 python -m venv 만들고 pip install -e . 하는 방식이야. 다른 레포들처럼 mise run test 한 줄로 돌아가게 구조를 바꾸고 싶어.",
+    "should_trigger": true
+  },
+  {
+    "query": "팀원들이 매번 source .venv/bin/activate 를 까먹어서 헤매. requirements.txt 랑 setup.py 밖에 없는 프로젝트인데 요즘 우리 표준대로 정리해줄래?",
+    "should_trigger": true
+  },
+  {
+    "query": "pyenv 로 3.9 고정해서 쓰는 오래된 스크립트 묶음이 있어. 파이썬 버전이랑 명령을 파일 하나로 몰아넣고 의존성도 uv 가 관리하게 만들고 싶어.",
+    "should_trigger": true
+  },
+  {
+    "query": "convert ~/work/scraper from the pip and setuptools setup to the uv-managed layout we use in every other repo",
+    "should_trigger": true
+  },
+  {
+    "query": "same conversion, but use uv_build as the build backend instead of the default one",
+    "should_trigger": true
+  },
+  {
+    "query": "do the conversion but leave the existing .venv in place, and also rewrite the readme lines that still tell people to pip install the dev extra",
+    "should_trigger": true
+  },
+  {
+    "query": "이 파이썬 프로젝트의 lint/test 명령을 mise.toml 로 일원화해야 하는데, 지금 구성이 venv 전제라 task 만 얹는다고 될 것 같지 않아. 제대로 된 전환 절차로 가자.",
+    "should_trigger": true
+  },
+  {
+    "query": "예전에 만든 파이썬 툴이 아직 egg-info 랑 .venv 를 달고 있어. 표준 툴체인으로 옮기는 절차대로 진행해줘.",
+    "should_trigger": true
+  },
+  {
+    "query": "mise.toml 에 test 태스크 하나만 추가해줘.",
+    "should_trigger": false
+  },
+  {
+    "query": "이 Node 프로젝트도 mise 로 툴 버전 고정하고 싶어.",
+    "should_trigger": false
+  },
+  {
+    "query": "uv sync keeps failing with a resolution conflict. figure out why.",
+    "should_trigger": false
+  },
+  {
+    "query": "pyproject.toml 의 ruff 규칙을 좀 더 엄격하게 조여줘.",
+    "should_trigger": false
+  },
+  {
+    "query": "add a python 3.10 job to the CI matrix",
+    "should_trigger": false
+  },
+  {
+    "query": "이 파이썬 레포에 AGENTS.md 새로 만들어줘.",
+    "should_trigger": false
+  },
+  {
+    "query": "지금까지 정리한 마이그레이션 계획을 이슈로 등록해줘.",
+    "should_trigger": false
+  },
+  {
+    "query": "audit setup.sh against the shell quality checklist",
+    "should_trigger": false
+  },
+  {
+    "query": "새로 만든 레포에 docs 폴더 골격 스캐폴딩해줘.",
+    "should_trigger": false
+  },
+  {
+    "query": "freeze the currently installed pip packages into requirements.txt",
+    "should_trigger": false
+  }
+]

@@ -1,0 +1,42 @@
+{
+  "name": "devenv",
+  "version": "0.1.0",
+  "description": "Set up a machine and its toolchain once: migrate a legacy Python venv project to mise + uv, manage dotfiles config files as symlinks, and delegate SSH keys to hosts through an audited manifest.",
+  "author": {
+    "name": "dEitY719",
+    "url": "https://github.com/dEitY719"
+  },
+  "homepage": "https://github.com/dEitY719/devenv-skills",
+  "repository": "https://github.com/dEitY719/devenv-skills",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "plugin",
+    "marketplace",
+    "devenv",
+    "mise",
+    "symlink",
+    "ssh"
+  ],
+  "skills": "./skills/",
+  "hooks": {},
+  "interface": {
+    "displayName": "Devenv",
+    "shortDescription": "One-time machine and toolchain environment setup",
+    "longDescription": "Devenv bundles the three skills used to set a machine up once and leave it reproducible: mise-migrate converts a legacy Python venv/pip project into the canonical mise + uv structure, symlink-manager moves a config file into the dotfiles repo and links it back with a backup, and ssh-delegate replaces ad-hoc ssh-copy-id with a manifest-backed, fingerprint-pinned, audit-logged delegation workflow. All three write, and each stops for confirmation before it does.",
+    "developerName": "dEitY719",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Migrate this venv project to mise + uv.",
+      "Manage this config file with a symlink."
+    ],
+    "websiteURL": "https://github.com/dEitY719/devenv-skills",
+    "brandColor": "#2563EB",
+    "screenshots": []
+  }
+}

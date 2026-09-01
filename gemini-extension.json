@@ -1,0 +1,6 @@
+{
+  "name": "devenv",
+  "description": "One-time machine and toolchain environment setup",
+  "version": "0.1.0",
+  "contextFileName": "GEMINI.md"
+}

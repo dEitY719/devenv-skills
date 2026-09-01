@@ -1,0 +1,23 @@
+name: validate
+
+# Validation is defined once, in `harness-skills`, and called from all fifteen
+# split-out skill repos (dotfiles #1410 D-10). Do not re-inline the checks here:
+# a copy is a fifteen-way drift risk, which is exactly what NF-2 forbids.
+#
+# To change what is checked, edit
+# dEitY719/harness-skills/.github/workflows/skill-check.yml.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    uses: dEitY719/harness-skills/.github/workflows/skill-check.yml@main
+    with:
+      plugin-name: devenv

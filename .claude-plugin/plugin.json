@@ -1,0 +1,21 @@
+{
+  "name": "devenv",
+  "description": "Set up a machine and its toolchain once: migrate a legacy Python venv project to mise + uv, manage dotfiles config files as symlinks, and delegate SSH keys to hosts through an audited manifest",
+  "version": "0.1.0",
+  "author": {
+    "name": "dEitY719",
+    "url": "https://github.com/dEitY719"
+  },
+  "homepage": "https://github.com/dEitY719/devenv-skills",
+  "repository": "https://github.com/dEitY719/devenv-skills",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "plugin",
+    "marketplace",
+    "devenv",
+    "mise",
+    "symlink",
+    "ssh"
+  ]
+}

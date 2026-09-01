@@ -1,0 +1,34 @@
+{
+  "name": "devenv",
+  "version": "0.1.0",
+  "description": "One-time machine and toolchain setup: mise + uv migration, dotfiles symlink management, audited SSH key delegation.",
+  "author": {
+    "name": "dEitY719",
+    "url": "https://github.com/dEitY719"
+  },
+  "homepage": "https://github.com/dEitY719/devenv-skills",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "plugin",
+    "marketplace",
+    "devenv",
+    "mise",
+    "symlink",
+    "ssh"
+  ],
+  "skills": "./skills/",
+  "skillInstructions": "Kimi Code tool mapping for the devenv skills.\n\nThe authoritative mapping lives in `dEitY719/harness-skills` at `references/kimi-tools.md` (https://github.com/dEitY719/harness-skills/blob/main/references/kimi-tools.md) — read it when a skill names a tool you do not recognise. That repo is the sole owner for every repo in the `dEitY719/*-skills` family; this repo carries no copy. Summary:\n\n- \"Ask the user\" -> `AskUserQuestion`. Every writing step must confirm through it first: `devenv:mise-migrate --apply`, every phase of `devenv:symlink-manager`, and `devenv:ssh-delegate add` / `revoke`.\n- `TodoWrite` -> Kimi Code's `TodoList` tool.\n- \"Dispatch a subagent\" -> `Agent` with `subagent_type: \"coder\"` (implementation) or `\"explore\"` (read-only). Never pass `general-purpose`.\n- Read / Write / Edit / Bash / Grep / Glob keep their exposed Kimi names. Search contents with `Grep`; match paths with `Glob`.\n- `devenv:mise-migrate` is dry-run by default: without an explicit `--apply` it must print the plan and write nothing.\n- `devenv:symlink-manager` moves a file out of its original location, so it must back the original up to `.backup` and verify the link before proceeding; a failed Phase 1 rolls back from that backup.\n- `devenv:ssh-delegate` shells out to `lib/ssh_delegate.sh` through `Bash`; `add` needs a real TTY for its single `ssh-copy-id` password prompt, and a host-fingerprint MISMATCH from `sync` is a hard stop that only a human may clear.",
+  "interface": {
+    "displayName": "Devenv",
+    "shortDescription": "One-time machine and toolchain environment setup",
+    "longDescription": "Devenv bundles the three skills that set a machine up once and leave it reproducible: mise-migrate, symlink-manager, and ssh-delegate.",
+    "developerName": "dEitY719",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/dEitY719/devenv-skills"
+  }
+}

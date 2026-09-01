@@ -1,0 +1,21 @@
+{
+  "name": "devenv-skills",
+  "version": "0.1.0",
+  "description": "Skills for one-time machine and toolchain environment setup: mise + uv migration, dotfiles symlinks, SSH key delegation",
+  "type": "module",
+  "main": ".opencode/plugins/devenv.js",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dEitY719/devenv-skills.git"
+  },
+  "keywords": [
+    "skills",
+    "plugin",
+    "marketplace",
+    "devenv",
+    "mise",
+    "symlink",
+    "ssh"
+  ]
+}
