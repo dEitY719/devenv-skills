@@ -1,4 +1,5 @@
 {
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "devenv-skills",
   "description": "Machine and toolchain environment setup skills — mise + uv migration, dotfiles symlink management, audited SSH key delegation",
   "owner": {
@@ -10,6 +11,7 @@
       "name": "devenv",
       "description": "Set up a machine and its toolchain once: migrate a legacy Python venv project to mise + uv, manage dotfiles config files as symlinks, and delegate SSH keys to hosts through an audited manifest",
       "version": "0.1.0",
+      "homepage": "https://github.com/dEitY719/devenv-skills",
       "source": "./",
       "author": {
         "name": "dEitY719",
