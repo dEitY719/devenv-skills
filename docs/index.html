@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ko" class="theme-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>devenv skills</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { interpolate-size: allow-keywords; }
+
+    html.theme-dark {
+      --bg: #0A0A0A; --surface: #141414; --surface-hover: #1C1C1C;
+      --border: rgba(255,255,255,0.07);
+      --text: #EDEDED; --text-secondary: #8b8b8b;
+      --accent: #3b82f6; --accent-secondary: #8b5cf6;
+      --positive: #10b981; --negative: #f43f5e; --warning: #f59e0b;
+      --code-bg: #101010;
+    }
+    html.theme-light {
+      --bg: #FAFAF9; --surface: #FFFFFF; --surface-hover: #F5F5F4;
+      --border: rgba(0,0,0,0.08);
+      --text: #0f172a; --text-secondary: #64748b;
+      --accent: #2563eb; --accent-secondary: #7c3aed;
+      --positive: #059669; --negative: #e11d48; --warning: #d97706;
+      --code-bg: #f4f4f5;
+    }
+
+    body {
+      font-family: 'Inter', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg); color: var(--text);
+      line-height: 1.65; -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.01em;
+      transition: background 0.3s, color 0.3s;
+      scrollbar-gutter: stable;
+    }
+    h1,h2,h3,h4 { color: var(--text); letter-spacing: -0.03em; line-height: 1.15; text-wrap: balance; }
+    h1 { font-weight: 700; }
+    code, pre { font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace; }
+    code { background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 0.86em; }
+    pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; overflow-x: auto; font-size: 13px; line-height: 1.6; }
+    pre code { background: none; border: none; padding: 0; }
+
+    .wrap { max-width: 900px; margin: 0 auto; padding: 64px 24px 96px; }
+    .eyebrow { display:inline-flex; align-items:center; gap:8px; font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color: var(--text-secondary); border:1px solid var(--border); background:var(--surface); border-radius:999px; padding:6px 14px; }
+    header.page { border-bottom: 1px solid var(--border); padding-bottom: 36px; margin-bottom: 36px; }
+    header.page h1 { font-size: clamp(32px, 6vw, 48px); margin: 20px 0 12px; }
+    header.page .lede { font-size: 17px; color: var(--text-secondary); max-width: 64ch; }
+
+    .warn { display:flex; gap:14px; align-items:flex-start; border:1px solid var(--warning); border-left-width:3px; background:var(--surface); border-radius:0 10px 10px 0; padding:16px 20px; margin: 28px 0 8px; font-size:14.5px; color:var(--text-secondary); }
+    .warn strong { color: var(--text); }
+    .warn .ic { flex:none; width:20px; height:20px; color: var(--warning); margin-top:2px; }
+
+    .flow { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin: 28px 0 8px; font-size:14.5px; }
+    .flow .node { background: var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px 18px; font-weight:600; }
+    .flow .node.out { border-color: var(--accent); color: var(--accent); }
+    .flow .node.mid { border-color: var(--accent-secondary); color: var(--accent-secondary); }
+    .flow .arrow { color: var(--text-secondary); font-weight:600; }
+
+    section { margin-top: 48px; }
+    section > h2 { font-size: 22px; display:flex; align-items:center; gap:12px; margin-bottom: 16px; }
+    section > h2 .num { flex:none; width:28px; height:28px; border-radius:7px; background:var(--accent); color:#fff; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; letter-spacing:0; }
+    section p { color: var(--text-secondary); font-size:15px; margin-bottom: 14px; max-width: 74ch; }
+    .label { font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--text-secondary); font-weight:600; margin: 18px 0 8px; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; transition: box-shadow .2s ease; }
+    .card:hover { box-shadow: 0 0 0 1px var(--border), 0 8px 18px rgba(0,0,0,0.10); }
+    .card h3 { font-size: 15px; margin-bottom: 7px; display:flex; align-items:center; gap:9px; }
+    .card p { font-size: 14.5px; margin: 0; }
+    .ic { flex:none; width:18px; height:18px; }
+    .stack { display:grid; gap:12px; }
+    .out-card { border-left: 3px solid var(--accent); }
+    .out-card.neg { border-left-color: var(--negative); }
+    .out-card.neg h3 { color: var(--negative); }
+
+    ul.gates { list-style:none; display:grid; gap:9px; margin-top:6px; }
+    ul.gates li { display:flex; gap:11px; align-items:flex-start; background:var(--surface); border:1px solid var(--border); border-radius:9px; padding:12px 15px; font-size:14.5px; color:var(--text-secondary); }
+    ul.gates .ic { color: var(--positive); margin-top:3px; }
+
+    footer.page { border-top:1px solid var(--border); margin-top:56px; padding-top:20px; font-size:13px; color:var(--text-secondary); }
+
+    @keyframes fadeInUp { from { opacity:0; transform: translateY(24px);} to { opacity:1; transform:none;} }
+    .animate { animation: fadeInUp 0.6s ease-out both; }
+    .reveal { opacity:0; transform: translateY(20px); transition: opacity .6s ease, transform .6s ease; }
+    .reveal.visible { opacity:1; transform:none; }
+    @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation:none !important; transition:none !important; } .reveal { opacity:1; transform:none; } }
+
+    @media print {
+      body { background:white !important; color:black !important; }
+      .viz-menu { display:none; }
+      .reveal { opacity:1 !important; transform:none !important; }
+      .card { break-inside: avoid; border:1px solid #ddd; box-shadow:none; }
+      * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+    @page { margin: 1in; }
+
+    .viz-menu { position: fixed; top: 16px; right: 16px; z-index: 9999; }
+    .viz-menu-toggle { width:44px; height:44px; border-radius:12px; background:var(--surface); border:1px solid var(--border); color:var(--text); cursor:pointer; display:flex; align-items:center; justify-content:center; backdrop-filter: blur(12px); transition: all .2s; }
+    .viz-menu-toggle:hover { background: var(--surface-hover); }
+    .viz-menu-dropdown { position:absolute; top:52px; right:0; min-width:200px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:8px; opacity:0; visibility:hidden; transform:translateY(-8px); transition:all .2s; backdrop-filter: blur(16px); }
+    .viz-menu-dropdown.open { opacity:1; visibility:visible; transform:none; }
+    .viz-menu-dropdown button { width:100%; padding:10px 14px; border:none; border-radius:8px; background:transparent; color:var(--text); font-size:14px; font-family:inherit; cursor:pointer; text-align:left; display:flex; align-items:center; gap:10px; transition: background .15s; }
+    .viz-menu-dropdown button:hover { background: var(--surface-hover); }
+
+    .skill-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+    .card code.inv { font-size: 12.5px; color: var(--text-secondary); display:block; margin: 2px 0 9px; }
+    .card .links { display:flex; flex-wrap:wrap; gap:14px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .card .links a { display:inline-flex; align-items:center; gap:6px; font-size:13.5px; font-weight:600; color: var(--accent); text-decoration:none; }
+    .card .links a:hover { text-decoration: underline; }
+    .card .links a .ic { width:15px; height:15px; }
+    .card .links a.usage { color: var(--accent-secondary); }
+    .pair { display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:14px; }
+    footer.site { margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--border); font-size: 13.5px; color: var(--text-secondary); }
+    footer.site a { color: var(--accent); text-decoration: none; }
+    footer.site a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="viz-menu">
+    <button class="viz-menu-toggle" onclick="toggleMenu()" aria-label="Menu">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <div class="viz-menu-dropdown" id="vizMenuDropdown">
+      <button onclick="cycleTheme()">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <span id="themeLabel">Dark</span>
+      </button>
+      <button onclick="window.print()">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M8 14h8v7H8z"/></svg>
+        <span>Print / PDF</span>
+      </button>
+    </div>
+  </div>
+
+  <main id="main-content" class="wrap">
+    <header class="page animate">
+      <span class="eyebrow">devenv plugin &middot; skill docs</span>
+      <h1>devenv skills</h1>
+      <p class="lede">머신과 툴체인을 <strong>한 번 세팅하는 작업</strong>을 맡는 스킬 3개 &mdash; 프로젝트 런타임, 로컬 설정 파일, 원격 접근. 세 층위는 서로 겹치지 않아 하나만 따로 써도 됩니다. 스킬마다 설명서 1건과 사용 예시 1건이 있습니다.</p>
+
+      <div class="flow"><span class="node">프로젝트 런타임</span><span class="node mid">로컬 설정 파일</span><span class="node out">원격 접근</span></div>
+
+      <div class="warn">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+        <span><strong>세 개 다 쓰는 스킬이고, read-only 감사기는 여기 없습니다.</strong> 대신 미리보기의 위치가 저마다 다릅니다 &mdash; <code>mise-migrate</code> 는 dry-run 이 기본이고 <code>--apply</code> 가 있어야 파일을 쓰며, <code>ssh-delegate add</code> 는 <code>--dry-run</code> 을 직접 붙여야 하고, <code>symlink-manager</code> 는 Phase 0 계획을 먼저 알린 뒤 곧바로 실행합니다.</span>
+      </div>
+    </header>
+
+    <section data-reveal>
+      <h2><span class="num">1</span>스킬 3개</h2>
+      <div class="skill-grid">
+      <article class="card" data-reveal>
+        <h3>mise-migrate</h3>
+        <code class="inv">/devenv:mise-migrate [path] [--apply]</code>
+        <p>pyenv / <code>python -m venv</code> + pip + setuptools 프로젝트를 <code>[tools]</code> &middot; <code>[env]</code> &middot; <code>[tasks.*]</code> 를 담은 <strong>mise.toml</strong> 로 옮기고, venv 와 의존성의 소유권을 uv 에 넘긴다. Python venv 프로젝트만 다룬다 &mdash; 비-Python 이거나 이미 <code>mise.toml</code> 이 있는 디렉터리는 짜맞추지 않고 거부한다.</p>
+        <div class="links">
+          <a href="skill-guides/mise-migrate.html"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg><span>설명서</span></a>
+          <a class="usage" href="skill-output/mise-migrate-usage.html"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4h16v12H4z"/><path d="M2 20h20M10 9l4 2-4 2z"/></svg><span>사용 예시</span></a>
+        </div>
+      </article>
+      <article class="card" data-reveal>
+        <h3>symlink-manager</h3>
+        <code class="inv">/devenv:symlink-manager &lt;file&gt;</code>
+        <p>설정 파일을 <code>~/dotfiles/bash/&lt;category&gt;/</code> 로 옮기고 원래 경로에서 심볼릭 링크로 되돌린다. 원본은 <code>.backup</code> 으로 남고, <code>&lt;app&gt;_init</code> &middot; <code>&lt;app&gt;_edit_*</code> 헬퍼와 help 문서를 갱신한 뒤 커밋까지 간다. 어느 Phase 든 실패하면 다음으로 넘어가지 않고 <code>[FAIL]</code> 로 멈춘다.</p>
+        <div class="links">
+          <a href="skill-guides/symlink-manager.html"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg><span>설명서</span></a>
+          <a class="usage" href="skill-output/symlink-manager-usage.html"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4h16v12H4z"/><path d="M2 20h20M10 9l4 2-4 2z"/></svg><span>사용 예시</span></a>
+        </div>
+      </article>
+      <article class="card" data-reveal>
+        <h3>ssh-delegate</h3>
+        <code class="inv">/devenv:ssh-delegate &lt;sync|add|list|test|revoke|doctor&gt;</code>
+        <p>한 번 쓰고 마는 <code>ssh-copy-id</code> 대신 <strong><code>~/.ssh/delegations.yml</code>(0600)</strong> 매니페스트가 어떤 키가 어느 호스트에 어느 계정으로 설치됐는지의 단일 기준이 된다. <code>add</code> 는 원격 비밀번호를 한 번 묻기 때문에 실제 터미널이 필요하고, fingerprint MISMATCH 는 우회하지 않고 멈춘다 &mdash; 재신뢰는 사람의 결정이다.</p>
+        <div class="links">
+          <a href="skill-guides/ssh-delegate.html"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg><span>설명서</span></a>
+          <a class="usage" href="skill-output/ssh-delegate-usage.html"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4h16v12H4z"/><path d="M2 20h20M10 9l4 2-4 2z"/></svg><span>사용 예시</span></a>
+        </div>
+      </article>
+      </div>
+    </section>
+
+    <section data-reveal>
+      <h2><span class="num">2</span>세 개의 층위</h2>
+      <p>세 스킬은 순서대로 이어지는 파이프라인이 아니다. 손대는 층이 서로 달라서 겹칠 일이 없고, 그래서 필요한 하나만 따로 실행하면 된다. 각 층이 어디까지이고 어디부터 아닌지는 이렇게 갈린다.</p>
+      <div class="pair">
+        <article class="card">
+          <h3>프로젝트 런타임 &mdash; mise-migrate</h3>
+          <p>저장소 <code>&lt;path&gt;</code> 안쪽만 본다. 그 바깥의 파일은 지우지 않고, 홈 디렉터리 설정도 SSH 도 건드리지 않는다. <code>--apply</code> 는 <code>uv sync</code> 까지 돌리므로 <code>uv</code> 가 <code>PATH</code> 에 있어야 한다.</p>
+        </article>
+        <article class="card">
+          <h3>로컬 설정 파일 &mdash; symlink-manager</h3>
+          <p>홈 디렉터리와 dotfiles 저장소 사이만 오간다. <code>bash/{claude,app,config,env}/</code> 레이아웃과 git 을 전제하고, 그 저장소에 커밋하는 것으로 끝난다 &mdash; 원격에는 아무것도 보내지 않는다.</p>
+        </article>
+        <article class="card">
+          <h3>원격 접근 &mdash; ssh-delegate</h3>
+          <p>여기서만 로컬 밖으로 나간다. 매니페스트와 ssh config 드롭인은 항상 0600 으로 쓰이고, 모든 이벤트는 <code>flock</code> 으로 직렬화된 JSONL 감사 로그에 남는다. 같은 alias 로 <code>add</code> 를 다시 돌려도 항목이 늘지 않는다.</p>
+        </article>
+      </div>
+    </section>
+
+    <footer class="site">
+      소스: <a href="https://github.com/dEitY719/devenv-skills">dEitY719/devenv-skills</a> &middot;
+      각 페이지는 <code>docs/skill-guides/</code> 와 <code>docs/skill-output/</code> 의 Markdown 원본에서 생성됩니다.
+    </footer>
+  </main>
+
+  <script>
+    function toggleMenu() { var d = document.getElementById('vizMenuDropdown'); if (d) d.classList.toggle('open'); }
+    document.addEventListener('click', function(e) { if (!e.target.closest('.viz-menu')) { var d = document.getElementById('vizMenuDropdown'); if (d) d.classList.remove('open'); } });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { var d = document.getElementById('vizMenuDropdown'); if (d) d.classList.remove('open'); } });
+
+    var savedTheme = localStorage.getItem('viz-theme');
+    var currentTheme = savedTheme || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    function applyTheme(t) {
+      document.documentElement.className = 'theme-' + t;
+      var lbl = document.getElementById('themeLabel');
+      if (lbl) lbl.textContent = (t === 'dark' ? 'Dark' : 'Light');
+      localStorage.setItem('viz-theme', t);
+      currentTheme = t;
+    }
+    function cycleTheme() { applyTheme(currentTheme === 'dark' ? 'light' : 'dark'); }
+    applyTheme(currentTheme);
+
+    document.querySelectorAll('[data-reveal]').forEach(function(el) { el.classList.add('reveal'); });
+    var revealObserver = new IntersectionObserver(function(entries) {
+      entries.forEach(function(e) { if (e.isIntersecting) { e.target.classList.add('visible'); revealObserver.unobserve(e.target); } });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach(function(el) { revealObserver.observe(el); });
+
+    async function downloadImage() {
+      var menu = document.querySelector('.viz-menu');
+      menu.style.display = 'none';
+      try {
+        var url = await htmlToImage.toPng(document.body, { quality: 1, pixelRatio: 2, filter: function(n) { return !n.classList || !n.classList.contains('viz-menu'); } });
+        var a = document.createElement('a'); a.href = url;
+        a.download = document.title.replace(/\s+/g, '-').toLowerCase() + '.png'; a.click();
+      } catch (e) { console.error('Download failed:', e); }
+      menu.style.display = '';
+    }
+    </script>
+</body>
+</html>
