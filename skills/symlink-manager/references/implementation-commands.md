@@ -51,8 +51,11 @@ Any failure in 1-4 removes the partial copy, restores the original from
 the `[OK]` verdict line and leaves `.backup` in place as the safety net.
 
 It refuses rather than guesses: unknown category, missing target, a target that
-is not a regular file, a missing or unwritable category directory, or a
-pre-existing `.backup` it would have to clobber.
+is not a regular file, a missing or unwritable category directory, a
+pre-existing `.backup` it would have to clobber (a dangling `.backup` symlink
+included -- following one would overwrite whatever it points at), or a
+destination that already exists in dotfiles with different content, which
+CLAUDE.md requires a human to confirm.
 
 Re-running on an already-migrated file is a no-op (that is how Phase 4 invokes
 it), and `--self-test` runs the backup + rollback assertions on scratch files.
