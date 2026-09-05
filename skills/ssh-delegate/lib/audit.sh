@@ -2,7 +2,7 @@
 # lib/audit.sh — append-only JSONL audit trail for every delegation event.
 #
 # Path: $DEVX_SSH_AUDIT_LOG, else ${XDG_STATE_HOME:-~/.local/state}/devx/
-# ssh-delegations.log (issue #877 L3). Concurrent writes are serialized with
+# ssh-delegations.log (dEitY719/dotfiles#877 L3). Concurrent writes are serialized with
 # flock when available; the append itself is atomic on POSIX for small lines.
 #
 # Sourced — POSIX sh only.

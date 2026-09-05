@@ -3,7 +3,7 @@
 #
 # Writes ~/.ssh/config.d/devx-delegations (override: $DEVX_SSH_CONFIG_DROPIN)
 # and adds a single `Include config.d/devx-delegations` line to ~/.ssh/config.
-# AI ssh always goes through a manifest alias (issue #877 L3 allowlist).
+# AI ssh always goes through a manifest alias (dEitY719/dotfiles#877 L3 allowlist).
 #
 # Sourced — POSIX sh only. Depends on lib/manifest.sh being sourced first.
 
@@ -60,7 +60,7 @@ ssh_config_regen() {
 }
 
 # Detect a pre-existing IdentityFile that would shadow the key `add` intends to
-# install for <alias> (issue #1132 defect A). `ssh -G <alias>` prints every
+# install for <alias> (dEitY719/dotfiles#1132 defect A). `ssh -G <alias>` prints every
 # identity ssh would actually try; an explicit `Host` block suppresses the
 # built-in defaults, so if our intended key ($2, tilde-expanded absolute) is
 # NOT among them a hand-written block is winning. In that case echo the identity

@@ -7,7 +7,8 @@
 
 ## Symbolic Link Initialization Function
 
-Add to `bash/app/<app>.bash`.
+Add to `bash/app/<app>.bash` — `bash/app/` does not exist in `dEitY719/dotfiles`
+yet, so create it before writing the file.
 
 > The `mv "$target" "$target.backup"` below is **not** the Phase 1 migration
 > backup. It belongs to the generated `<app>_init`, which runs later — on a

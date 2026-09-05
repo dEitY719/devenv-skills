@@ -3,10 +3,14 @@
 ## Implementation Result
 
 ```text
-Original location: ~/dotfiles/bash/claude/settings.json
-Symbolic link:     ~/.claude/settings.json -> ~/dotfiles/bash/claude/settings.json
-Management script: ~/dotfiles/shell-common/tools/external/claude.sh
+Source (dotfiles): ~/dotfiles/claude/settings.json
+Symbolic link:     ~/.claude/settings.json -> ~/dotfiles/claude/settings.json
+Management script: ~/dotfiles/shell-common/tools/integrations/claude.sh
 ```
+
+This one predates the `bash/<category>/` convention and sits at the dotfiles
+root, so it is the layout as it actually is, not what Phase 1 would produce for
+a new file today.
 
 ## Added Functions
 

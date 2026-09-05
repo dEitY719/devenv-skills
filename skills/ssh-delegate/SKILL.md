@@ -6,6 +6,7 @@ description: >-
   키 위임 표준화", "ssh-copy-id 한 거 매니페스트로 관리", "어떤 서버에 접근
   가능한지", "delegate ssh access", "revoke ssh key from host".
 allowed-tools: Bash, Read, Grep
+license: MIT
 metadata:
   model_recommendation:
     tier: haiku
@@ -60,7 +61,7 @@ skill's directory):
 - `add` runs `ssh-copy-id` interactively — the user enters the remote password
   **once**. Tell them to expect that single prompt; do not try to supply it. In
   a non-interactive shell (a Claude `!` session) `add` fails fast with the exact
-  command to run in a real terminal — relay it verbatim (issue #1132).
+  command to run in a real terminal — relay it verbatim (dEitY719/dotfiles#1132).
 - If the alias already has a hand-written `Host` block with a different
   `IdentityFile`, `add` adopts that key (via `ssh -G`) so the installed key is
   the one ssh actually offers — surface the adoption warning it prints.
@@ -68,7 +69,7 @@ skill's directory):
   command, config regen, verify) without touching the remote — use it first
   when the user is unsure.
 - `add --key-only` installs the key without regenerating the ssh config drop-in
-  — for a host that already has a working hand-written alias (issue #1132).
+  — for a host that already has a working hand-written alias (dEitY719/dotfiles#1132).
 - Never bypass a fingerprint MISMATCH from `sync`. Surface the ALERT and stop;
   re-trust is a human decision (see `references/safety-model.md`).
 

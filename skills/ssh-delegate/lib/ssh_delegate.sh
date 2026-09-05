@@ -1,12 +1,12 @@
 #!/bin/sh
 # ssh_delegate.sh — manifest-based SSH key delegation + audit log.
 #
-# Entry point for the devenv:ssh-delegate skill (issue #877). Sub-commands:
+# Entry point for the devenv:ssh-delegate skill (dEitY719/dotfiles#877). Sub-commands:
 #   sync | add | list | test | revoke | doctor | help
 #
 # This script is called explicitly (never auto-sourced) as
 # `bash skills/ssh-delegate/lib/ssh_delegate.sh`. Its helper libs
-# are siblings in the same lib/ dir (repo convention #699). Self-contained;
+# are siblings in the same lib/ dir (repo convention dEitY719/dotfiles#699). Self-contained;
 # degrades to plain printf when ux_lib is absent. POSIX sh only.
 
 # `set -u` only — several lib helpers (manifest_default, manifest_has,
@@ -89,7 +89,7 @@ cmd_add() {
     [ -n "$default_idf" ] || default_idf='~/.ssh/id_ed25519'
     want_idf="$(ssh_config_expand_tilde "$default_idf")"
 
-    # Defect A (#1132): a hand-written `Host` block may pin a different
+    # Defect A (dEitY719/dotfiles#1132): a hand-written `Host` block may pin a different
     # IdentityFile that shadows our drop-in, so the key we install is never the
     # key ssh offers — a silent mismatch. Detect it via `ssh -G` and adopt the
     # resolved key so install target == connect key. `detected` stays in ~-form.
@@ -116,7 +116,7 @@ cmd_add() {
         return 0
     fi
 
-    # Defect C (#1132): fail fast — before mutating anything — when ssh-copy-id
+    # Defect C (dEitY719/dotfiles#1132): fail fast — before mutating anything — when ssh-copy-id
     # has no way to read the remote password here. A misleading `Permission
     # denied` in a non-interactive shell is worse than a clear up-front error.
     if ! ssh_install_can_prompt; then
@@ -142,7 +142,7 @@ cmd_add() {
     fi
     audit_log_event install-ok "$alias_" ""
     if [ -n "$key_only" ]; then
-        # Defect B (#1132): the host already has a working hand-written alias —
+        # Defect B (dEitY719/dotfiles#1132): the host already has a working hand-written alias —
         # install the key but leave the user's ssh config untouched (no regen).
         ux_info "--key-only: leaving ssh config untouched (no drop-in regen)"
     else

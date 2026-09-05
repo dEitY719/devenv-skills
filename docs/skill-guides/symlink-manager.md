@@ -35,6 +35,10 @@
 | `bash/config/` | 일반 설정 파일 |
 | `bash/env/` | 환경 변수 |
 
+이 중 `dEitY719/dotfiles` 에 실제로 존재하는 디렉터리는 `bash/env/` 뿐이다.
+Phase 1 헬퍼는 없는 카테고리 디렉터리를 만들지 않고 거부하므로, 먼저
+`mkdir -p ~/dotfiles/bash/<category>` 를 해야 한다.
+
 경로 규약은 `Source: ~/dotfiles/bash/<category>/<filename>` →
 `Target: ~/<target_dir>/<filename>` 이다.
 

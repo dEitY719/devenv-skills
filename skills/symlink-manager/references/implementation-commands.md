@@ -10,11 +10,15 @@ ls -la <target_file>
 
 - Analyze file purpose and content
 - Select appropriate category (claude/app/config/env)
-- Check category directory structure
+- Confirm `~/dotfiles/bash/<category>/` exists. Of the four categories only
+  `bash/env/` is present in `dEitY719/dotfiles` today, and the Phase 1 helper
+  refuses a missing category directory rather than creating one, so
+  `mkdir -p` it first.
 
 ```bash
-# Find or identify bash script location
-cat ~/dotfiles/shell-common/tools/external/<app>.sh
+# Read the app's management script if it already has one -- absent is normal
+cat ~/dotfiles/shell-common/tools/integrations/<app>.sh 2>/dev/null ||
+    echo "no management script yet - Phase 2 creates one"
 ```
 
 Plan file paths:

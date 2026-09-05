@@ -6,6 +6,7 @@ description: >-
   venv 프로젝트를 mise+uv 로 전환", "migrate this venv project to mise".
   Python-venv projects only.
 allowed-tools: Bash, Read, Edit, Write, Grep
+license: MIT
 metadata:
   model_recommendation:
     tier: sonnet

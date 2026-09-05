@@ -18,8 +18,9 @@ on a new box and then want reproducible:
 
 The skills were extracted from `dEitY719/dotfiles`
 (`claude/skills/devx-{mise-migrate,symlink-manager,ssh-delegate}`) as a snapshot
-— see the first commit for the source SHA. The dotfiles copies remain in place
-for now; they are removed in a later phase of that repo's migration plan.
+— see the first commit for the source SHA. The dotfiles copies are gone: that
+tree was deleted in dotfiles Phase 4-1 (`ad0d33d5`), so this repo is now the
+only home for these three skills.
 
 ## Layout: root manifests, one flat `skills/`
 
@@ -66,7 +67,7 @@ at this repo's root, and adding one for tool mappings is a bug.
   a command writes `/devenv:ssh-delegate` (or `/devenv-ssh-delegate`).
 - **Progressive disclosure.** `SKILL.md` stays under 100 lines (CI enforces it)
   and names which `references/` file to read and when. All three are currently
-  at 94-95 lines — there is almost no headroom, so an addition means an
+  at 95-99 lines — there is almost no headroom, so an addition means an
   extraction. Detail lives in `references/`. Do not inline a reference file
   back into `SKILL.md`.
 - **Description budget.** CI sums every skill description and fails past 5,440
@@ -110,14 +111,16 @@ The version appears in seven manifests: `.claude-plugin/marketplace.json`,
 `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`,
 `.kimi-plugin/plugin.json`, `.hermes-plugin/plugin.yaml`,
 `gemini-extension.json`, and `package.json`. CI checks that they agree — bump
-all of them together. Versioning is independent per repo (#1410 D-9); this repo
-does not move in lockstep with its siblings.
+all of them together. Versioning is independent per repo
+(dEitY719/dotfiles#1410 D-9); this repo does not move in lockstep with its
+siblings.
 
 ## CI
 
 `.github/workflows/validate.yml` is a thin caller into `harness-skills`'
-reusable `skill-check.yml` (#1410 D-10). To change what is checked, edit that
-workflow in `harness-skills` — do not re-inline the checks here.
+reusable `skill-check.yml` (dEitY719/dotfiles#1410 D-10). To change what is
+checked, edit that workflow in `harness-skills` — do not re-inline the checks
+here.
 
 ## No emojis
 

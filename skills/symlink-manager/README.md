@@ -52,6 +52,10 @@ Invoke this skill when you need to:
 - `bash/config/`: General configuration files
 - `bash/env/`: Environment variable configs
 
+Of the four, only `bash/env/` exists in `dEitY719/dotfiles` today. The Phase 1
+helper refuses a missing category directory rather than creating one, so
+`mkdir -p ~/dotfiles/bash/<category>` first.
+
 ## Management Functions
 
 Generated functions for each managed config:
@@ -66,7 +70,7 @@ Generated functions for each managed config:
 
 ```bash
 # File migration
-~/.claude/settings.json -> ~/dotfiles/bash/claude/settings.json
+~/.claude/settings.json -> ~/dotfiles/claude/settings.json
 
 # Generated functions
 claude_init              # Set up symbolic links
@@ -122,7 +126,8 @@ config.prod.json     # Production
 
 ## Related Files
 
-- Source: `dEitY719/dotfiles` `claude/skills/devx-symlink-manager/` (pre-split origin)
+- Source: `dEitY719/dotfiles` `claude/skills/devx-symlink-manager/` (pre-split
+  origin; that tree was deleted in dotfiles Phase 4-1)
 - Skill: `skills/symlink-manager/SKILL.md` (this skill)
 - Phase 1/4 helper: `skills/symlink-manager/lib/symlink_migrate.sh`
   (`--self-test` asserts the backup and the rollback)
