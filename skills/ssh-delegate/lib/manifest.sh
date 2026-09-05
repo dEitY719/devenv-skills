@@ -4,7 +4,7 @@
 # Manifest format is documented in references/manifest-schema.md. The
 # canonical store is `~/.ssh/delegations.yml` (override: $DEVX_SSH_MANIFEST).
 #
-# ENGINE NOTE (issue #877): the issue named `yq` as the parser. yq is treated
+# ENGINE NOTE (dEitY719/dotfiles#877): the issue named `yq` as the parser. yq is treated
 # as an OPTIONAL validator (see `doctor`); the authoritative read/write path
 # below is dependency-free awk so the skill runs standalone on a bare machine
 # — an explicit acceptance requirement ("standalone 동작"). All writes go

@@ -1,7 +1,7 @@
 #!/bin/sh
 # lib/install.sh — install a public key on a remote and pin its host key.
 #
-# Layer L2 (issue #877): first install accepts the host key with
+# Layer L2 (dEitY719/dotfiles#877): first install accepts the host key with
 # `accept-new`, captures the SHA256 fingerprint, and pins it in the manifest.
 # Subsequent installs/verifies compare against the pinned value — a mismatch
 # is an ALERT, never an automatic re-trust.
@@ -28,7 +28,7 @@ ssh_install_capture_fingerprint() {
         awk '/SHA256:/ {for(i=1;i<=NF;i++) if($i ~ /^SHA256:/){print $i; exit}}'
 }
 
-# Can ssh-copy-id obtain the remote password in this environment? (issue #1132
+# Can ssh-copy-id obtain the remote password in this environment? (dEitY719/dotfiles#1132
 # defect C.) `ssh-copy-id` needs a TTY for its single password prompt; a
 # non-interactive shell (a Claude `!` session, CI) without a usable SSH_ASKPASS
 # makes it die as `ssh_askpass: No such file or directory` -> `Permission

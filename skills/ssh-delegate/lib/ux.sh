@@ -3,7 +3,7 @@
 #
 # Standalone by design: prefers the dotfiles ux_lib when SHELL_COMMON points
 # at it, otherwise falls back to plain printf so the skill works on a bare
-# machine (issue #877: "ux_lib 부재 환경에서도 plain printf fallback").
+# machine (dEitY719/dotfiles#877: "ux_lib 부재 환경에서도 plain printf fallback").
 #
 # Sourced — no shebang execution. POSIX sh only.
 

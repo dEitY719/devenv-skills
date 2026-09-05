@@ -121,9 +121,9 @@ the full rationale and contribution rules.
 
 There is deliberately **no `references/` directory at this repo's root**. The
 shared per-harness tool mappings are owned solely by
-[`dEitY719/harness-skills`](https://github.com/dEitY719/harness-skills) (#1410
-F-5 / NF-2); this repo links to them rather than carrying copies, so one tool
-rename stays one edit.
+[`dEitY719/harness-skills`](https://github.com/dEitY719/harness-skills)
+(dEitY719/dotfiles#1410 F-5 / NF-2); this repo links to them rather than
+carrying copies, so one tool rename stays one edit.
 
 The `.kimi-plugin/` manifest is pre-provisioned: Kimi CLI is not installed on the
 maintainer's machines yet, and shipping the manifest now costs nothing and saves
@@ -152,8 +152,9 @@ To change what is checked, edit that workflow, not this repo.
 
 These skills were extracted from
 [`dEitY719/dotfiles`](https://github.com/dEitY719/dotfiles)
-(`claude/skills/devx-{mise-migrate,symlink-manager,ssh-delegate}`) as a content
-snapshot — no history rewriting. The source commit SHA is recorded in this
+(`claude/skills/devx-{mise-migrate,symlink-manager,ssh-delegate}`, since removed
+in that repo's Phase 4-1) as a content snapshot — no history rewriting. The
+source commit SHA is recorded in this
 repo's first commit message. The `devx-` prefix is dropped here because the
 plugin namespace (`devenv:`) now supplies it.
 

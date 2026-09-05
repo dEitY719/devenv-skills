@@ -2,12 +2,12 @@
   {
     "query": "/devenv:mise-migrate ./tools/log-parser --apply",
     "should_trigger": true,
-    "note": "slash-literal: update if the skill is renamed (#1410)"
+    "note": "slash-literal: update if the skill is renamed (dEitY719/dotfiles#1410)"
   },
   {
     "query": "/devenv-mise-migrate 로 먼저 계획만 뽑아서 보여줘",
     "should_trigger": true,
-    "note": "slash-literal: update if the skill is renamed (#1410)"
+    "note": "slash-literal: update if the skill is renamed (dEitY719/dotfiles#1410)"
   },
   {
     "query": "이 레포는 아직 python -m venv 만들고 pip install -e . 하는 방식이야. 다른 레포들처럼 mise run test 한 줄로 돌아가게 구조를 바꾸고 싶어.",
