@@ -33,8 +33,8 @@ Source:  ~/dotfiles/bash/<category>/<filename>
 Target:  ~/<target_dir>/<filename> -> Source
 ```
 
-**Categories**: `bash/claude/`, `bash/app/`, `bash/config/`, `bash/env/`. Only
-`bash/env/` exists in dotfiles today — `mkdir -p` the rest before Phase 1.
+**Categories**: `bash/claude/`, `bash/app/`, `bash/config/`, `bash/env/`. Phase 1
+refuses a missing category dir — `mkdir -p` first (only `bash/env/` exists today).
 
 **Strategy**: `.backup` → copy to dotfiles → `cmp -s` verify → remove original
 → symlink → verify. All of it runs inside `lib/symlink_migrate.sh`.

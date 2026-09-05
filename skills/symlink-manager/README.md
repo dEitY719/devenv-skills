@@ -52,9 +52,9 @@ Invoke this skill when you need to:
 - `bash/config/`: General configuration files
 - `bash/env/`: Environment variable configs
 
-Of the four, only `bash/env/` exists in `dEitY719/dotfiles` today. The Phase 1
-helper refuses a missing category directory rather than creating one, so
-`mkdir -p ~/dotfiles/bash/<category>` first.
+The Phase 1 helper refuses a missing category directory rather than creating
+one, so `mkdir -p "$DOTFILES_ROOT/bash/<category>"` first. Of the four, only
+`bash/env/` is present in `dEitY719/dotfiles` at the time of writing.
 
 ## Management Functions
 
@@ -68,8 +68,12 @@ Generated functions for each managed config:
 
 ## Example: Claude Code Settings
 
+Legacy layout — this file predates the `bash/<category>/` convention and lives
+at the dotfiles root. It is recorded as it actually is; a migration run today
+would land it under `bash/<category>/`.
+
 ```bash
-# File migration
+# File migration (legacy path, not what Phase 1 produces today)
 ~/.claude/settings.json -> ~/dotfiles/claude/settings.json
 
 # Generated functions
