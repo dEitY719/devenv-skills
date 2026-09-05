@@ -9,19 +9,18 @@
 # exits non-zero. Prose in references/ can drift from a command list; a script
 # that rolls itself back cannot.
 #
-# Usage:
-#   symlink_migrate.sh <target_file> <category> [--commit]
-#   symlink_migrate.sh --self-test
-#
-# <category> is one of claude | app | config | env. The dotfiles root is
-# $DOTFILES_ROOT (default ~/dotfiles). Phase 4 (--commit) failures do NOT roll
-# back: the link is already good at that point, and the backup is still there.
+# Usage is in usage() below, the single copy. Phase 4 (--commit) failures do
+# NOT roll back: the link is already good at that point, and the backup is
+# still there.
 #
 # Called explicitly, never sourced. POSIX sh only.
 
 set -u
 
 DOTFILES="${DOTFILES_ROOT:-$HOME/dotfiles}"
+# Indirected so --self-test can force the post-`rm` failure, the same way
+# ssh-delegate's lib/verify.sh indirects ssh through $DEVX_SSH_BIN.
+LN_BIN="${SYMLINK_MIGRATE_LN:-ln}"
 
 usage() {
     cat <<'EOF'
@@ -80,7 +79,7 @@ migrate() {
     DEST="$DEST_DIR/$FILENAME"
     BACKUP="$TARGET.backup"
     DEST_PREEXISTING=no
-    [ -e "$DEST" ] && DEST_PREEXISTING=yes
+    { [ -e "$DEST" ] || [ -L "$DEST" ]; } && DEST_PREEXISTING=yes
 
     if [ -L "$TARGET" ]; then
         # Already migrated — Phase 4 re-invokes this script with --commit, and
@@ -92,8 +91,18 @@ migrate() {
         [ -f "$TARGET" ] || fail 0 "target is not a regular file: $TARGET"
         [ -w "$DEST_DIR" ] || fail 1 "category dir not writable: $DEST_DIR"
         # An existing .backup is someone else's safety net. Never clobber it.
-        if [ -e "$BACKUP" ]; then
+        # `-L` is not redundant: `-e` follows symlinks, so a dangling
+        # `<target>.backup` symlink reads as absent and the `cp` below would
+        # follow it and overwrite whatever it points at.
+        if [ -e "$BACKUP" ] || [ -L "$BACKUP" ]; then
             fail 1 "backup already exists: $BACKUP (move it aside first)"
+        fi
+        # Refuse to overwrite a different file already in the dotfiles repo:
+        # rollback restores the original but cannot un-overwrite the
+        # destination, and CLAUDE.md requires confirmation before replacing an
+        # existing file. Identical content is a no-op, so it is allowed.
+        if [ "$DEST_PREEXISTING" = yes ] && ! cmp -s "$TARGET" "$DEST"; then
+            fail 1 "destination exists with different content: $DEST (confirm and move it aside first)"
         fi
 
         # 1. Backup first — before anything can touch the original.
@@ -106,7 +115,7 @@ migrate() {
 
         # 3. Only now is removing the original safe.
         rm -f "$TARGET" || rollback 1 "cannot remove original: $TARGET"
-        ln -s "$DEST" "$TARGET" || rollback 1 "cannot create symlink: $TARGET"
+        "$LN_BIN" -s "$DEST" "$TARGET" || rollback 1 "cannot create symlink: $TARGET"
 
         # 4. Verify the link resolves and reads back identical.
         [ -L "$TARGET" ] || rollback 1 "not a symlink after ln: $TARGET"
@@ -131,8 +140,9 @@ migrate() {
         "$TARGET" "$CATEGORY" "$SHA" "$BACKUP"
 }
 
-# The two assertions issue #5 names: the backup exists at the moment of
-# deletion, and the rollback actually fires. Run: symlink_migrate.sh --self-test
+# The assertions issue #5 names -- the backup exists at the moment of deletion
+# and the rollback actually fires -- plus the two refusals PR review found.
+# Run: symlink_migrate.sh --self-test
 self_test() {
     st_tmp=$(mktemp -d) || { printf 'mktemp failed\n' >&2; return 1; }
     trap 'rm -rf "$st_tmp"' EXIT INT TERM
@@ -165,13 +175,12 @@ self_test() {
     ( migrate "$st_tmp/sm.conf" env no ) >>"$st_tmp/out" 2>&1
     st_assert "[ $? -eq 0 ]" "re-run on an already-linked target is a no-op"
 
-    printf 'case 2: induced failure rolls back, original survives\n'
-    rm -f "$st_tmp/sm.conf" "$st_tmp/sm.conf.backup"
+    printf 'case 2: failure after the original is deleted rolls back\n'
     printf 'sentinel\n' >"$st_tmp/sm2.conf"
-    # Destination is a directory, so the copy cannot verify. Root-proof, unlike
-    # chmod a-w, which root ignores.
-    mkdir -p "$DOTFILES/bash/env/sm2.conf"
-    ( migrate "$st_tmp/sm2.conf" env no ) >"$st_tmp/out2" 2>&1
+    # Forces `ln` to fail, so the failure lands in the one window that loses
+    # data: the original is already removed. Root-proof, unlike chmod a-w.
+    ( SYMLINK_MIGRATE_LN=false; LN_BIN=false; migrate "$st_tmp/sm2.conf" env no ) \
+        >"$st_tmp/out2" 2>&1
     st_assert "[ $? -ne 0 ]" "migration reports failure"
     st_assert "[ -f '$st_tmp/sm2.conf' ]" "original still exists"
     st_assert "[ ! -L '$st_tmp/sm2.conf' ]" "original is not a dangling link"
@@ -179,6 +188,30 @@ self_test() {
         "original content is intact"
     st_assert "[ ! -e '$st_tmp/sm2.conf.backup' ]" \
         "backup consumed by the restore"
+    st_assert "[ ! -e '$DOTFILES/bash/env/sm2.conf' ]" \
+        "partial copy removed from dotfiles"
+
+    printf 'case 3: refuses a dangling .backup symlink instead of following it\n'
+    printf 'precious\n' >"$st_tmp/precious"
+    printf 'sentinel\n' >"$st_tmp/sm3.conf"
+    ln -s "$st_tmp/precious" "$st_tmp/sm3.conf.backup"
+    ( migrate "$st_tmp/sm3.conf" env no ) >"$st_tmp/out3" 2>&1
+    st_assert "[ $? -ne 0 ]" "migration reports failure"
+    st_assert "grep -q 'backup already exists' '$st_tmp/out3'" \
+        "refused on the pre-existing backup"
+    st_assert "grep -qx precious '$st_tmp/precious'" \
+        "the symlink's target was not overwritten"
+
+    printf 'case 4: refuses to overwrite a different file in dotfiles\n'
+    printf 'sentinel\n' >"$st_tmp/sm4.conf"
+    printf 'someone-elses-config\n' >"$DOTFILES/bash/env/sm4.conf"
+    ( migrate "$st_tmp/sm4.conf" env no ) >"$st_tmp/out4" 2>&1
+    st_assert "[ $? -ne 0 ]" "migration reports failure"
+    st_assert "grep -qx someone-elses-config '$DOTFILES/bash/env/sm4.conf'" \
+        "the existing dotfiles file is untouched"
+    st_assert "[ ! -e '$st_tmp/sm4.conf.backup' ]" \
+        "refused before any backup was written"
+    st_assert "grep -qx sentinel '$st_tmp/sm4.conf'" "original untouched"
 
     if [ "$st_rc" -eq 0 ]; then
         printf '[OK] symlink_migrate.sh self-test\n'
@@ -188,6 +221,10 @@ self_test() {
         cat "$st_tmp/out" >&2
         printf -- '--- case 2 output ---\n' >&2
         cat "$st_tmp/out2" >&2
+        printf -- '--- case 3 output ---\n' >&2
+        cat "$st_tmp/out3" >&2
+        printf -- '--- case 4 output ---\n' >&2
+        cat "$st_tmp/out4" >&2
     fi
     return "$st_rc"
 }
