@@ -7,7 +7,14 @@
 
 ## Symbolic Link Initialization Function
 
-Add to `bash/app/<app>.bash`:
+Add to `bash/app/<app>.bash`.
+
+> The `mv "$target" "$target.backup"` below is **not** the Phase 1 migration
+> backup. It belongs to the generated `<app>_init`, which runs later — on a
+> newly provisioned machine that already has the dotfiles repo — and only when
+> a stray regular file sits where the link should go. Phase 1's own backup and
+> rollback live in `lib/symlink_migrate.sh`; do not read this template as
+> evidence that Phase 1 is protected.
 
 ```bash
 <app>_init() {
