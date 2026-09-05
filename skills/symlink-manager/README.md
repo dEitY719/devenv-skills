@@ -76,7 +76,8 @@ claude-help             # Show all commands
 
 ## Safety Features
 
-- Auto-backup of existing files (.backup extension)
+- `<target_file>.backup` written before the original is removed, and restored
+  automatically if any Phase 1 step fails (`lib/symlink_migrate.sh`)
 - .gitignore integration for sensitive files
 - Verification of symbolic links
 - Template file support for secrets
@@ -100,7 +101,7 @@ Before completion, ensures:
 - Help documentation updated
 - Changes committed to git
 - No sensitive data exposed
-- Backup created
+- Backup created and verified byte-identical before the original was removed
 
 ## Advanced Features
 
@@ -123,6 +124,8 @@ config.prod.json     # Production
 
 - Source: `dEitY719/dotfiles` `claude/skills/devx-symlink-manager/` (pre-split origin)
 - Skill: `skills/symlink-manager/SKILL.md` (this skill)
+- Phase 1/4 helper: `skills/symlink-manager/lib/symlink_migrate.sh`
+  (`--self-test` asserts the backup and the rollback)
 
 ## Author
 

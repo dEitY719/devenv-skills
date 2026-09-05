@@ -21,4 +21,7 @@ Before completion, ensure ALL:
 3. Help documentation updated
 4. Changes committed to git
 5. No sensitive data in repository
-6. Backup created for original file
+6. `<target_file>.backup` present and byte-identical to the pre-migration
+   original — asserted by `lib/symlink_migrate.sh`, whose zero exit status is
+   the proof. Do not tick this by inspection; if the helper exited non-zero it
+   already rolled the original back and the run is a `[FAIL]`.

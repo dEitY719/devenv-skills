@@ -35,11 +35,12 @@ Target:  ~/<target_dir>/<filename> -> Source
 **Categories**: `bash/claude/` (Claude Code), `bash/app/` (app-specific),
 `bash/config/` (general config), `bash/env/` (environment vars)
 
-**Strategy**: Move original → auto-backup (.backup) → create symlink → verify
+**Strategy**: `.backup` → copy to dotfiles → `cmp -s` verify → remove original
+→ symlink → verify. All of it runs inside `lib/symlink_migrate.sh`.
 
 ## Execution Workflow
 
-**Stop on first failure**: any phase failure → abort, report `[FAIL]`, do not proceed to next phase. Phase 1 파일 이동 실패는 자동 롤백 (.backup 복원).
+**Stop on first failure**: any phase failure → abort, report `[FAIL]`, do not proceed to next phase. Phase 1 실패 시 `lib/symlink_migrate.sh` 가 `.backup` 에서 자동 롤백하고 non-zero 로 종료한다 — 원본은 손실되지 않는다.
 
 ### Phase 0: Analysis (ALWAYS)
 
@@ -48,8 +49,9 @@ Read `references/implementation-commands.md` for exact bash commands.
 
 ### Phase 1: File Migration (SEQUENTIAL)
 
-Copy file to dotfiles, remove original, create symbolic link, verify.
-Read `references/implementation-commands.md` for exact bash commands.
+Run `<skill-dir>/lib/symlink_migrate.sh <target_file> <category>` and relay its
+verdict line. Never hand-run the copy/`rm`/`ln` steps — the backup and rollback
+only exist inside the script. Read `references/implementation-commands.md`.
 
 ### Phase 2: Management Functions
 
@@ -63,7 +65,8 @@ Read `references/function-templates.md` for the help block template.
 
 ### Phase 4: Version Control (SEQUENTIAL)
 
-Stage and commit all changes.
+`git add` the Phase 2/3 edits, then re-run the same helper with `--commit`; the
+re-run is a no-op on the already-migrated file and commits both.
 Read `references/implementation-commands.md` for git commands.
 
 ### Phase 5: Validation (ALWAYS)
