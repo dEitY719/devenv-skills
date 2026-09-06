@@ -14,7 +14,17 @@ CHECKS=(
     skills/symlink-manager/lib/symlink_migrate.sh
 )
 
+# Every entry must be a tracked file, and CI must say so by name rather than
+# by whatever `sh` prints when it cannot open one. CHECKS reaches outside the
+# skill whose change added it, so an entry can go stale from a rename made
+# elsewhere in the repo.
 missing=0
+for c in "${CHECKS[@]}"; do
+    git ls-files --error-unmatch "$c" >/dev/null 2>&1 && continue
+    echo "FAIL  $c is listed in tests/run.sh but is not a tracked file"
+    missing=1
+done
+
 while IFS= read -r s; do
     # Matches the case label in any spelling a script might use for it
     # (`--self-test)`, `--self-test|--selftest)`), not one exact string.
