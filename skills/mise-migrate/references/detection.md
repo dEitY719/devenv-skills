@@ -1,50 +1,28 @@
 # Detection — is this a legacy Python project? (Step 1)
 
-Run after parsing args. Decide whether `<path>` is a migratable legacy
-Python project, retarget if needed, or refuse early. All read-only.
+Run after parsing args, before anything else. All read-only.
 
 ```
 bash <skill-dir>/lib/detect_project.sh <path>
 ```
 
-The script implements the rules below and is their SSOT — Step 1 reads its
-two output lines (`path=`, `status=`, plus `candidate=` lines when
-ambiguous) instead of walking the tree by hand. The rest of this file is the
-contract it satisfies and the wording of the notes to surface.
+The script owns the rules — the marker set, the nested-fallback threshold, the
+already-migrated short-circuit, and the exit codes. Do not restate them here:
+a second copy is what lets the two drift. `detect_project.sh --help` prints
+them, and the script itself is the SSOT.
 
-## Signals
+## Reading its output
 
-A pyenv `.venv/` / `pyvenv.cfg` is the signal worth migrating, but its
-absence is **not** fatal — a pip/`requirements*.txt` project still
-qualifies. The project markers are `pyproject.toml`, `setup.py`, or
-`requirements*.txt` at `<path>`.
+| `status=` | exit | What Step 1 does |
+|---|---|---|
+| `ok` | 0 | Proceed to Step 2 with `path=`. |
+| `nested` | 0 | Proceed with the retargeted `path=`, after noting `[INFO] retargeting to nested project: <path>`. |
+| `already-migrated` | 0 | Stop. `[INFO] devenv:mise-migrate: already migrated` — an idempotent no-op, not a failure. |
+| `no-marker` | 1 | Stop. `[FAIL] devenv:mise-migrate: not a Python project: <path>` |
+| `ambiguous` | 1 | Stop. List the `candidate=` lines it printed, so the user can re-run against one of them. |
 
-## Decision rules (in order)
+## Why the `.venv/` is not required
 
-1. **No marker at `<path>` → nested fallback.** If `<path>` itself has no
-   marker but exactly **one** direct child dir (depth 1) does, retarget to
-   it and note:
-
-   ```
-   [INFO] retargeting to nested project: <child>
-   ```
-
-   - **≥2 candidate child dirs** → list them and fail (exit 1).
-   - **Still none** anywhere →
-
-     ```
-     [FAIL] devenv:mise-migrate: not a Python project: <path>
-     ```
-
-     (exit 1).
-
-2. **Already migrated.** A `mise.toml` already exists at the (possibly
-   retargeted) path → idempotent no-op:
-
-   ```
-   [INFO] devenv:mise-migrate: already migrated
-   ```
-
-   (exit 0).
-
-3. Otherwise proceed to Step 2 (Extract Migration Facts).
+A pyenv `.venv/` or `pyvenv.cfg` is the signal most worth migrating, but its
+absence is not fatal — a pip / `requirements*.txt` project qualifies just as
+much, and after a failed earlier attempt the venv may already be gone.

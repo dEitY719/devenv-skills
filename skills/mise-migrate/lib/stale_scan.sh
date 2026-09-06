@@ -16,7 +16,8 @@
 #   excluded=<n>            always last; hits suppressed as history/archive
 #
 # exit 0  scan completed (with or without hits -- hits are a finding, not an error)
-# exit 2  usage error
+# exit 2  usage error, or grep could not read part of <path>: a scan that
+#         skipped files is NOT reported as a clean scan
 #
 # Never writes. The opt-in --update-docs rewrite is the skill's Step 4.5, and
 # uses the replacement table in references/stale-scan.md.
@@ -66,26 +67,47 @@ scan() {
         return 2
     fi
 
-    hits=$(mktemp) || return 2
-    trap 'rm -f "$hits"' EXIT INT TERM
-
+    # Two passes on purpose. `grep -rl` prints one bare path per line, so the
+    # exclusion decision never has to split a `path:line:text` record at the
+    # first `:` -- a path that contains a colon would be truncated by that
+    # split and silently escape the history/archive filter. The second pass
+    # re-greps only the files that survive, and the `:` in the printed record
+    # is then ours, not something we had to parse back out.
     # -I skips binaries; .git is never live instructions.
-    grep -rEnI --exclude-dir=.git -e "$ERE" -- "$root" > "$hits" 2>/dev/null
+    files=$(grep -rlEI --exclude-dir=.git -e "$ERE" -- "$root")
+    rc=$?
+    # 0 = matches, 1 = none, >=2 = a real error (an unreadable path, a bad
+    # ERE). Never swallowed: a scan that quietly skipped files and still
+    # reported success is exactly the silent regression this step exists to
+    # surface, one level up.
+    if [ "$rc" -ge 2 ]; then
+        printf 'stale_scan.sh: grep failed (rc=%s) -- scan incomplete\n' "$rc" >&2
+        return 2
+    fi
 
     excluded=0
-    while IFS= read -r line; do
-        file=${line%%:*}
-        rel=${file#"$root"/}
+    # Here-doc, not a pipe: a pipeline would run this loop in a subshell and
+    # $excluded would not survive it.
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        rel=${f#"$root"}
+        rel=${rel#/}
         if is_excluded "$rel"; then
-            excluded=$((excluded + 1))
+            # Count lines, do not print them. rc>=2 is unreachable -- the
+            # first pass already read this same file -- so a bare fallback is
+            # enough here.
+            n=$(grep -cEI -e "$ERE" -- "$f") || n=0
+            excluded=$((excluded + n))
         else
-            printf '%s\n' "$line"
+            grep -nEI -e "$ERE" -- "$f" | while IFS= read -r hit; do
+                printf '%s:%s\n' "$f" "$hit"
+            done
         fi
-    done < "$hits"
+    done <<EOF
+$files
+EOF
 
     printf 'excluded=%s\n' "$excluded"
-    rm -f "$hits"
-    trap - EXIT INT TERM
     return 0
 }
 
@@ -102,10 +124,16 @@ self_test() {
     printf 'pip install decided here\n'      > "$tmp/docs/decisions/0001.md"
     printf 'pip install\n'                   > "$tmp/.venv/bin/activate"
     printf 'clean file, nothing legacy\n'    > "$tmp/NOTES.md"
+    # Colons in paths: the reason scan() never splits a grep record at ':'.
+    # Splitting would truncate these two to "$tmp/archive/we" and "$tmp/od",
+    # flipping BOTH verdicts -- the archived one would be reported as live and
+    # the live one would be dropped.
+    printf 'pip install, archived\n'         > "$tmp/archive/we:ird.md"
+    printf 'pip install, live\n'             > "$tmp/od:d.md"
 
     out=$(scan "$tmp") || { printf 'FAIL  scan exited non-zero\n'; return 1; }
 
-    want_live="README.md docs/setup.md"
+    want_live="README.md docs/setup.md od:d.md"
     for f in $want_live; do
         if printf '%s\n' "$out" | grep -q "^$tmp/$f:"; then
             printf 'ok    reported live hit %s\n' "$f"
@@ -116,23 +144,40 @@ self_test() {
 
     # README.md carries two matching alternatives on one line -> one grep line.
     live=$(printf '%s\n' "$out" | grep -vc '^excluded=')
-    if [ "$live" -eq 2 ]; then
-        printf 'ok    exactly 2 live hits\n'
+    if [ "$live" -eq 3 ]; then
+        printf 'ok    exactly 3 live hits\n'
     else
-        printf 'FAIL  %s live hits (want 2):\n%s\n' "$live" "$out"; fail=1
+        printf 'FAIL  %s live hits (want 3):\n%s\n' "$live" "$out"; fail=1
     fi
 
     got=$(printf '%s\n' "$out" | sed -n 's/^excluded=//p')
-    if [ "$got" = 4 ]; then
-        printf 'ok    excluded=4 (archive, plan, decisions, .venv)\n'
+    if [ "$got" = 5 ]; then
+        printf 'ok    excluded=5 (archive x2, plan, decisions, .venv)\n'
     else
-        printf 'FAIL  excluded=%s (want 4)\n%s\n' "$got" "$out"; fail=1
+        printf 'FAIL  excluded=%s (want 5)\n%s\n' "$got" "$out"; fail=1
     fi
 
     if printf '%s\n' "$out" | grep -q 'NOTES.md'; then
         printf 'FAIL  clean file reported\n'; fail=1
     else
         printf 'ok    clean file not reported\n'
+    fi
+
+    # An unreadable path must fail the scan, not pass it quietly. Skipped as
+    # root, where chmod 000 does not deny anything.
+    if [ "$(id -u)" -eq 0 ]; then
+        printf 'ok    unreadable-path check skipped (running as root)\n'
+    else
+        mkdir -p "$tmp/locked" && printf 'pip install\n' > "$tmp/locked/x.md"
+        chmod 000 "$tmp/locked"
+        scan "$tmp" >/dev/null 2>&1
+        rc=$?
+        chmod 755 "$tmp/locked"
+        if [ "$rc" -ne 0 ]; then
+            printf 'ok    unreadable path fails the scan (rc=%s)\n' "$rc"
+        else
+            printf 'FAIL  unreadable path reported a clean scan\n'; fail=1
+        fi
     fi
 
     [ "$fail" -eq 0 ] && printf 'ok    stale_scan.sh self-test passed\n'
