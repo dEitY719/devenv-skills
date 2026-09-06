@@ -12,7 +12,7 @@ defaults:
 entries:
   - alias: gpu1-bwyoon
     user: bwyoon
-    host: 12.81.221.129
+    host: 10.0.0.1
     note: "Internal GPU box — bwyoon account"
     expires: 2026-08-30
     installed_at: 2026-05-30T12:04:05Z

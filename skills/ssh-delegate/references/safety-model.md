@@ -16,7 +16,7 @@ TOFU (trust on first use) and blind trust on every use.
 ## Audit record shape
 
 ```json
-{"ts":"2026-05-30T12:04:05Z","event":"add","alias":"gpu1-bwyoon","actor":"deity","detail":"bwyoon@12.81.221.129"}
+{"ts":"2026-05-30T12:04:05Z","event":"add","alias":"gpu1-bwyoon","actor":"deity","detail":"bwyoon@10.0.0.1"}
 ```
 
 One JSON object per line (JSONL), append-only. `flock` serializes concurrent

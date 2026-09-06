@@ -21,7 +21,7 @@ install.
 The underlying script is `lib/ssh_delegate.sh` — callable directly:
 
 ```
-lib/ssh_delegate.sh add bwyoon@12.81.221.129 gpu1-bwyoon
+lib/ssh_delegate.sh add bwyoon@10.0.0.1 gpu1-bwyoon
 ssh gpu1-bwyoon            # passwordless after one password prompt
 ```
 
@@ -35,30 +35,33 @@ ssh gpu1-bwyoon            # passwordless after one password prompt
 - **Adopts an existing IdentityFile.** If a hand-written `Host <alias>` block
   already pins a different key, `add` detects it via `ssh -G` and installs
   *that* key (with a warning) so the installed key matches the one ssh offers.
-- **`--key-only`** installs the key but skips ssh-config regeneration — use it
-  when the host already has a working hand-written alias you don't want rewritten.
+
+## Flags
+
+| Flag | Applies to | Default | Description |
+|---|---|---|---|
+| `--dry-run` | `add` | off | Print the planned actions (manifest upsert, `ssh-copy-id` command, config regen, verify) without touching the remote. |
+| `--key-only` | `add` | off | Install the key but skip ssh-config regeneration — for a host with a working hand-written alias you don't want rewritten. |
+| `--json` | `list` | off | Emit JSON instead of the table (`references/output-format.md`). |
+| `--all` | `test` | off | Verify every active alias instead of one. |
 
 ## Sub-commands
 
 | Command | What it does |
 |---|---|
 | `sync` | Regenerates the ssh config drop-in, pins first-seen fingerprints, verifies every active alias. Aborts on a fingerprint MISMATCH. |
-| `add <user>@<host> [alias]` | Upserts a manifest entry, runs `ssh-copy-id`, pins the fingerprint, regenerates config, verifies. `--dry-run` prints actions only; `--key-only` installs the key but leaves ssh config untouched (host already has a working hand-written alias). |
-| `list [--json]` | Prints the entry table (alias / user / host / last-verified / state) or JSON. |
+| `add <user>@<host> [alias]` | Upserts a manifest entry, runs `ssh-copy-id`, pins the fingerprint, regenerates config, verifies. Flags: see the table above. |
+| `list [--json]` | Prints the entry table (alias / user / host / last-verified / state) or JSON — shapes in `references/output-format.md`. |
 | `test [<alias>\|--all]` | `ssh -o BatchMode=yes <alias> true` — no password fallback. |
 | `revoke <alias>` | Removes the key line from the remote `authorized_keys`, sets `revoked: true`, regenerates config. |
 | `doctor` | Checks identity file, manifest perms, ssh/yq presence, audit-log writability, expired entries. |
 
-## Safety model (3-layer)
+## Safety model
 
-- **L1 Identity** — only the manifest's `identity_file` is ever used.
-- **L2 Host trust** — first install pins the SHA256 fingerprint. A later
-  mismatch is an ALERT that halts `sync`; the skill never auto-re-trusts.
-- **L3 Allowlist + audit** — AI ssh always goes through a manifest alias.
-  Every event is appended as JSONL to
-  `~/.local/state/devx/ssh-delegations.log` (flock-serialized).
-
-See `references/safety-model.md` and `references/revoke-runbook.md`.
+`references/safety-model.md` is the SSOT for the 3-layer model (identity
+pinning, host-fingerprint pinning, allowlist + audit); `references/revoke-runbook.md`
+covers teardown. The audit log it refers to is
+`~/.local/state/devx/ssh-delegations.log` — JSONL, append-only, flock-serialized.
 
 ## Environment overrides
 
