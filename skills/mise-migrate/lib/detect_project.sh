@@ -39,7 +39,13 @@ EOF
 has_marker() {
     [ -f "$1/pyproject.toml" ] && return 0
     [ -f "$1/setup.py" ] && return 0
-    ls "$1"/requirements*.txt >/dev/null 2>&1
+    # Plain glob, not `ls`: the nested scan calls this once per child dir, and
+    # a fork per child to test a glob the shell can test itself is waste. An
+    # unmatched glob stays literal in POSIX sh, so `[ -f ]` rejects it.
+    for _m in "$1"/requirements*.txt; do
+        [ -f "$_m" ] && return 0
+    done
+    return 1
 }
 
 detect() {
@@ -62,7 +68,7 @@ detect() {
             has_marker "$d" || continue
             n=$((n + 1))
             target=$d
-            candidates="${candidates}${d}
+            candidates="${candidates}candidate=${d}
 "
         done
         if [ "$n" -eq 1 ]; then
@@ -78,11 +84,7 @@ detect() {
     esac
 
     printf 'path=%s\nstatus=%s\n' "$target" "$status"
-    if [ "$status" = ambiguous ]; then
-        printf '%s' "$candidates" | while IFS= read -r c; do
-            [ -n "$c" ] && printf 'candidate=%s\n' "$c"
-        done
-    fi
+    [ "$status" = ambiguous ] && printf '%s' "$candidates"
 
     case "$status" in
         no-marker|ambiguous) return 1 ;;
@@ -117,7 +119,8 @@ self_test() {
 
     mkdir -p "$tmp/outer/inner" && : > "$tmp/outer/inner/pyproject.toml"
     check "nested retarget" "$tmp/outer" nested 0
-    got=$(detect "$tmp/outer" | sed -n 's/^path=//p')
+    # $got still holds that run's output -- no need to detect() twice.
+    got=$(printf '%s\n' "$got" | sed -n 's/^path=//p')
     if [ "$got" != "$tmp/outer/inner" ]; then
         printf 'FAIL  nested retarget path: %s\n' "$got"; fail=1
     else
