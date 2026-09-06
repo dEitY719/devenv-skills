@@ -258,19 +258,28 @@ cmd_revoke() {
     idf="$(ssh_config_expand_tilde "$idf")"
     pub="${idf}.pub"
     ssh_bin="${DEVX_SSH_BIN:-ssh}"
+    remote_key="unreachable"
     if [ -f "$pub" ]; then
         keytext="$(awk '{print $1" "$2}' "$pub")"
         ux_info "removing key from remote authorized_keys for '$al'"
         # Portable mktemp (template + TMPDIR fallback) and a non-empty $t guard
         # so a mktemp failure can never truncate the remote authorized_keys.
-        "$ssh_bin" -o BatchMode=yes "$al" \
+        if "$ssh_bin" -o BatchMode=yes "$al" \
             "f=\$HOME/.ssh/authorized_keys; [ -f \"\$f\" ] && { t=\$(mktemp \"\${TMPDIR:-/tmp}/ssh-delegate.XXXXXX\") && [ -n \"\$t\" ] && { grep -vF '$keytext' \"\$f\" >\"\$t\" || true; } && cat \"\$t\" >\"\$f\" && rm -f \"\$t\"; }" \
-            >/dev/null 2>&1 || ux_warning "could not reach remote — marking revoked locally anyway"
+            >/dev/null 2>&1; then
+            remote_key="removed"
+        else
+            ux_warning "could not reach remote — marking revoked locally anyway"
+        fi
     fi
     manifest_set_field "$al" revoked true
     ssh_config_regen
     audit_log_event revoke "$al" ""
-    ux_success "revoked '$al' (remote key removed, manifest revoked:true)"
+    if [ "$remote_key" = "removed" ]; then
+        ux_success "revoked '$al' (remote key removed, manifest revoked:true)"
+    else
+        ux_success "revoked '$al' (manifest revoked:true, remote_key=unreachable)"
+    fi
 }
 
 cmd_doctor() {
