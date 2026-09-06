@@ -82,8 +82,7 @@ print this line; its per-sub-command fields are tabled in
 [FAIL] devenv:ssh-delegate cmd=<sub-command> reason=<one-line>
 ```
 
-A fingerprint MISMATCH `[ALERT]` from `sync` is terminal: report the ALERT and
-stop the run. Write no verdict line for it, and never restate it as `[FAIL]`.
+An `[ALERT]` is terminal (Step 2): no verdict line, never restated as `[FAIL]`.
 After `add` confirm `ssh <alias>` works passwordless; after `revoke` that the
 entry reads `state=revoked` (or warn on an unreachable host —
 `references/revoke-runbook.md`).
