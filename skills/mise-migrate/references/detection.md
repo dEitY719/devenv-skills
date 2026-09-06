@@ -3,7 +3,7 @@
 Run after parsing args, before anything else. All read-only.
 
 ```
-bash <skill-dir>/lib/detect_project.sh <path>
+sh <skill-dir>/lib/detect_project.sh <path>
 ```
 
 The script owns the rules — the marker set, the nested-fallback threshold, the

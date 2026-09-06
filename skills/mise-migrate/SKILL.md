@@ -36,7 +36,7 @@ Positional `[path]` defaults to `.`. Flags: `--dry-run` (default),
 `--apply`, `--backend hatchling|uv_build` (default `hatchling`),
 `--keep-venv`, `--update-docs`. Full table in `references/help.md`.
 
-`bash <skill-dir>/lib/detect_project.sh <path>` prints `path=` + `status=` — it owns
+`sh <skill-dir>/lib/detect_project.sh <path>` prints `path=` + `status=` — it owns
 the marker set, the nested-fallback retarget, the already-migrated
 short-circuit, and the refusal exit codes (`references/detection.md`).
 
@@ -61,7 +61,7 @@ full before→after walkthrough):
    carried over, `optional-dependencies.dev` → `[dependency-groups].dev`.
 3. **Cleanup list** — stale `.venv/` + `*.egg-info/` (skipped by
    `--keep-venv`).
-4. **Stale references** — `bash <skill-dir>/lib/stale_scan.sh <path>` prints one
+4. **Stale references** — `sh <skill-dir>/lib/stale_scan.sh <path>` prints one
    `file:line:match` per live legacy-workflow hit plus `excluded=<n>` for
    the history/archive suppressions. Rewrite table + opt-in
    `--update-docs`: `references/stale-scan.md`.

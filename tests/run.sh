@@ -16,7 +16,9 @@ CHECKS=(
 
 missing=0
 while IFS= read -r s; do
-    grep -q -- '--self-test)' "$s" || continue
+    # Matches the case label in any spelling a script might use for it
+    # (`--self-test)`, `--self-test|--selftest)`), not one exact string.
+    grep -qE -- '^[[:space:]]*(-[^)]*\|)*--self-test(\|[^)]*)?\)' "$s" || continue
     listed=0
     for c in "${CHECKS[@]}"; do [ "$c" = "$s" ] && listed=1; done
     if [ "$listed" -eq 0 ]; then

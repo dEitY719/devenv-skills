@@ -31,6 +31,9 @@ set -u
 # uv folds those deps into pyproject.toml, so the file reference is stale too.
 ERE='python -m venv|python3 -m venv|pip install|\.venv/bin/activate|\.\[dev\]|setuptools|requirements\.txt'
 
+# A literal newline, for the path-safety guard in scan().
+_NL=$(printf '\nx'); _NL=${_NL%x}
+
 usage() {
     cat <<'EOF'
 devenv:mise-migrate -- stale legacy-reference scan (read-only)
@@ -64,6 +67,17 @@ scan() {
     [ -n "$root" ] || root=/
     if [ ! -d "$root" ]; then
         printf 'stale_scan.sh: not a directory: %s\n' "$1" >&2
+        return 2
+    fi
+
+    # A newline inside a filename -- POSIX permits one -- would split a single
+    # path into two in the list below, and the halves would neither match the
+    # exclusion globs nor re-grep, so its hits would vanish from a scan that
+    # still reported excluded=0 and exit 0. Refuse instead: under-reporting
+    # while claiming a complete scan is the exact failure this step exists to
+    # catch one level up.
+    if find "$root" -name "*${_NL}*" -print 2>/dev/null | grep -q .; then
+        printf 'stale_scan.sh: a path under %s contains a newline -- scan refused\n' "$root" >&2
         return 2
     fi
 
@@ -161,6 +175,18 @@ self_test() {
         printf 'FAIL  clean file reported\n'; fail=1
     else
         printf 'ok    clean file not reported\n'
+    fi
+
+    # A newline in a path must fail the scan, not silently drop that file.
+    nlfile="$tmp/two${_NL}lines.md"
+    printf 'pip install\n' > "$nlfile"
+    scan "$tmp" >/dev/null 2>&1
+    rc=$?
+    rm -f "$nlfile"
+    if [ "$rc" -eq 2 ]; then
+        printf 'ok    newline in a path refuses the scan (rc=2)\n'
+    else
+        printf 'FAIL  newline in a path scanned anyway (rc=%s)\n' "$rc"; fail=1
     fi
 
     # An unreadable path must fail the scan, not pass it quietly. Skipped as
