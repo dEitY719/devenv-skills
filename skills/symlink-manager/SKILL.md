@@ -92,8 +92,3 @@ read `references/example-claude-settings.md`.
 ```
 
 Next: source ~/.bashrc && <app>help  # 새 심볼릭 링크 검증, 또는 rollback 시 ./setup.sh
-
-## Command
-
-When invoked, IMMEDIATELY analyze the target file, determine the category, and
-EXECUTE the workflow. Start with Phase 0 and announce the plan before any change.

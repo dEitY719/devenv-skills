@@ -3,7 +3,8 @@
 ## Usage
 
 ```
-/symlink-manager <target_file>
+/devenv:symlink-manager <target_file>
+/devenv-symlink-manager <target_file>
 ```
 
 ## Arguments

@@ -11,17 +11,7 @@ Verify ALL before completion:
 - [ ] Help function shows new commands
 - [ ] Files staged in git
 - [ ] Sensitive files in .gitignore (if applicable)
-
-## Quality Gates
-
-Before completion, ensure ALL:
-
-1. Symbolic link verified and functional
-2. Management functions tested
-3. Help documentation updated
-4. Changes committed to git
-5. No sensitive data in repository
-6. `<target_file>.backup` present and byte-identical to the pre-migration
-   original — asserted by `lib/symlink_migrate.sh`, whose zero exit status is
-   the proof. Do not tick this by inspection; if the helper exited non-zero it
-   already rolled the original back and the run is a `[FAIL]`.
+- [ ] `<target_file>.backup` present and byte-identical to the pre-migration
+      original — asserted by `lib/symlink_migrate.sh`, whose zero exit status
+      is the proof. Do not tick this by inspection; if the helper exited
+      non-zero it already rolled the original back and the run is a `[FAIL]`.
