@@ -28,7 +28,7 @@ entries:
 | `identity_file` | default / per-entry | Private key; its `.pub` is what gets installed. |
 | `port` | default / per-entry | SSH port. |
 | `strict_host_key_checking` | default | Written into the config drop-in. |
-| `alias` | entry (PK) | ssh Host alias the AI must use. |
+| `alias` | entry (PK) | ssh Host alias the AI must use. `add` upserts by alias — rerunning it for an existing one refreshes `last_verified_at` in place, never a duplicate entry. |
 | `user`, `host` | entry | Remote account + address. |
 | `note` | entry | Free-text description. |
 | `expires` | entry | `YYYY-MM-DD`; `doctor` flags past entries. |
