@@ -3,7 +3,7 @@
 Two different things print here, and conflating them is the trap:
 
 1. **The script's own output** — `lib/ux.sh` markers, shown per sub-command
-   below. This is what `lib/` really emits today.
+   below.
 2. **The skill's closing verdict line** — written by the *model* in Step 3
    after relaying that output. No sub-command prints it; it is the skill's
    report contract, not the script's.
@@ -62,11 +62,10 @@ gpu1-ssai            ssai         10.0.0.1           -                    revoke
 ## `list --json`
 
 Five keys per entry, in this order; `revoked` is a JSON boolean, the rest are
-strings. The column headers above are the display names of these fields —
+strings. The column headers above are the display names of these fields:
 `LAST_VERIFIED` is `last_verified_at`, `STATE` is `revoked` rendered as
-`active` / `revoked`, and `ALIAS` / `USER` / `HOST` map to the obvious keys.
-The manifest itself carries more fields (`manifest-schema.md`); `list --json`
-deliberately projects only these five.
+`active` / `revoked`. The manifest itself carries more fields
+(`manifest-schema.md`); `list --json` deliberately projects only these five.
 
 ```json
 [{"alias":"gpu1-bwyoon","user":"bwyoon","host":"10.0.0.1","last_verified_at":"2026-05-30T12:04:09Z","revoked":false}]
@@ -120,7 +119,7 @@ One line per alias, single or `--all`:
 The one output that must never be papered over:
 
 ```
-[ALERT] gpu1-bwyoon: host fingerprint changed -- sync ABORTED (no auto re-trust)
+[ALERT] gpu1-bwyoon: host fingerprint changed — sync ABORTED (no auto re-trust)
 ```
 
 Report it verbatim and stop. Do not re-run `sync`, do not `add` over it, and do
@@ -133,6 +132,6 @@ not remove the pin to make it pass.
 [OK] manifest perms OK (/home/you/.ssh/delegations.yml)
 [OK] default identity present (/home/you/.ssh/id_ed25519)
 [OK] ssh present
-[..] yq absent -- using built-in awk parser (OK)
+[..] yq absent — using built-in awk parser (OK)
 [OK] audit log writable (/home/you/.local/state/devx/ssh-delegations.log)
 ```

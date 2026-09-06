@@ -38,12 +38,12 @@ ssh gpu1-bwyoon            # passwordless after one password prompt
 
 ## Flags
 
-| Flag | Applies to | Default | Description |
-|---|---|---|---|
-| `--dry-run` | `add` | off | Print the planned actions (manifest upsert, `ssh-copy-id` command, config regen, verify) without touching the remote. |
-| `--key-only` | `add` | off | Install the key but skip ssh-config regeneration — for a host with a working hand-written alias you don't want rewritten. |
-| `--json` | `list` | off | Emit JSON instead of the table (`references/output-format.md`). |
-| `--all` | `test` | off | Verify every active alias instead of one. |
+| Flag | Applies to | Description |
+|---|---|---|
+| `--dry-run` | `add` | Print the planned actions (manifest upsert, `ssh-copy-id` command, config regen, verify) without touching the remote. |
+| `--key-only` | `add` | Install the key but skip ssh-config regeneration — for a host with a working hand-written alias you don't want rewritten (dEitY719/dotfiles#1132). |
+| `--json` | `list` | Emit JSON instead of the table (`references/output-format.md`). |
+| `--all` | `test` | Verify every active alias instead of one. |
 
 ## Sub-commands
 
