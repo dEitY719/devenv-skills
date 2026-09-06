@@ -131,6 +131,15 @@ One line per alias, single or `--all`:
 [OK] revoked 'gpu1-bwyoon' (remote key removed, manifest revoked:true)
 ```
 
+If the host is unreachable, the script says so instead of claiming removal
+(`revoke-runbook.md` § "If the remote is unreachable"):
+
+```
+[..] removing key from remote authorized_keys for 'gpu1-bwyoon'
+[WARN] could not reach remote — marking revoked locally anyway
+[OK] revoked 'gpu1-bwyoon' (manifest revoked:true, remote_key=unreachable)
+```
+
 ## `sync`
 
 ```
