@@ -11,7 +11,7 @@ plan; rewriting them is opt-in via `--update-docs`.
 ## Scan (always, both dry-run and `--apply`)
 
 ```
-bash <skill-dir>/lib/stale_scan.sh <path>
+sh <skill-dir>/lib/stale_scan.sh <path>
 ```
 
 The legacy-workflow ERE and the exclusion list are the script's, not this
