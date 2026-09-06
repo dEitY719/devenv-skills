@@ -3,6 +3,15 @@
 Run after parsing args. Decide whether `<path>` is a migratable legacy
 Python project, retarget if needed, or refuse early. All read-only.
 
+```
+bash <skill-dir>/lib/detect_project.sh <path>
+```
+
+The script implements the rules below and is their SSOT — Step 1 reads its
+two output lines (`path=`, `status=`, plus `candidate=` lines when
+ambiguous) instead of walking the tree by hand. The rest of this file is the
+contract it satisfies and the wording of the notes to surface.
+
 ## Signals
 
 A pyenv `.venv/` / `pyvenv.cfg` is the signal worth migrating, but its

@@ -46,28 +46,10 @@
 
 ## What the skill does
 
-1. **Detects** a legacy Python project (pyproject / setup.py /
-   requirements + a pyenv-style `.venv`) and refuses non-Python or
-   already-migrated (`mise.toml` present) directories. If the given path
-   has no project file but exactly one direct subdir does, it retargets
-   to that nested project.
-2. **Extracts** the Python version, runtime + dev deps, `[project.scripts]`
-   entry points, test runner/`testpaths`, and current build backend.
-3. **Plans** four artifacts: the generated `mise.toml`, a
-   `pyproject.toml` diff, the cleanup list, and a read-only **stale
-   reference** scan (in-repo docs/scripts still describing the old
-   `venv`/`pip` flow). In dry-run this is the single review surface —
-   nothing is written.
-4. **`--apply` only** — writes `mise.toml`, rewrites `pyproject.toml`
-   (backend → hatchling, `optional-dependencies.dev` →
-   `[dependency-groups].dev`), runs `uv sync`, and removes the stale
-   `.venv/` + `*.egg-info/`. With `--update-docs`, also rewrites the
-   stale in-repo references found in step 3.
-
-> **PEP 735 silent regression** — lifting `dev` out of
-> `optional-dependencies` means `pip install -e ".[dev]"` silently stops
-> installing dev deps (exit 0, no error). The skill warns whenever this
-> happens; switch such callers to `uv sync`.
+The workflow is Steps 1-5 of `SKILL.md`; the per-step detail lives in
+`references/detection.md`, `extraction.md`, `mise-template.md`,
+`pyproject-rewrite.md`, and `stale-scan.md` (PEP 735 silent-regression
+`[WARN]` included).
 
 ## What the skill will NOT do
 

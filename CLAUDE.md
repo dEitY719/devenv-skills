@@ -122,6 +122,11 @@ reusable `skill-check.yml` (dEitY719/dotfiles#1410 D-10). To change what is
 checked, edit that workflow in `harness-skills` — do not re-inline the checks
 here.
 
+That workflow also runs every `tests/*.sh` in this repo. `tests/run.sh` is the
+single entry point: it calls each `lib/*.sh` that ships a `--self-test`. A new
+`lib/` script with a self-test gets one line there; the assertions stay in the
+script, next to the code they cover.
+
 ## No emojis
 
 Anywhere in this repo. Token efficiency.

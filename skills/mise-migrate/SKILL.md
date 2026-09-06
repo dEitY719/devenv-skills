@@ -36,9 +36,9 @@ Positional `[path]` defaults to `.`. Flags: `--dry-run` (default),
 `--apply`, `--backend hatchling|uv_build` (default `hatchling`),
 `--keep-venv`, `--update-docs`. Full table in `references/help.md`.
 
-Detect a legacy Python project (pyproject / setup.py / `requirements*.txt`),
-applying the nested-fallback retarget, the already-migrated short-circuit,
-and the refusal exit codes in `references/detection.md`.
+`bash <skill-dir>/lib/detect_project.sh <path>` prints `path=` + `status=` — it owns
+the marker set, the nested-fallback retarget, the already-migrated
+short-circuit, and the refusal exit codes (`references/detection.md`).
 
 ## Step 2: Extract Migration Facts (read-only)
 
@@ -61,10 +61,10 @@ full before→after walkthrough):
    carried over, `optional-dependencies.dev` → `[dependency-groups].dev`.
 3. **Cleanup list** — stale `.venv/` + `*.egg-info/` (skipped by
    `--keep-venv`).
-4. **Stale references** — read-only grep of `<path>` for the legacy
-   `venv`/`pip`/`.[dev]` workflow, reported as `file:line` (history /
-   archive excluded). Full ERE + opt-in `--update-docs` rewrite:
-   `references/stale-scan.md`.
+4. **Stale references** — `bash <skill-dir>/lib/stale_scan.sh <path>` prints one
+   `file:line:match` per live legacy-workflow hit plus `excluded=<n>` for
+   the history/archive suppressions. Rewrite table + opt-in
+   `--update-docs`: `references/stale-scan.md`.
 
 Surface the PEP 735 silent-regression `[WARN]` whenever a `dev` extra is
 lifted into `[dependency-groups]` — `pip install -e ".[dev]"` then installs
