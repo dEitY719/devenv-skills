@@ -36,11 +36,21 @@ and no verification state:
 | `cmd=` | Fields on `[OK]` |
 |---|---|
 | `sync` | `verified=<n>/<n>` |
-| `add` | `alias=<alias> state=active verified=<yes\|no>` |
+| `add` | `alias=<alias> state=active verified=yes` (dry-run: `state=dry-run`, no `verified` field) |
 | `list` | `entries=<n> revoked=<n>` |
 | `test` | `checked=<n> failed=<n>` |
 | `revoke` | `alias=<alias> state=revoked remote_key=<removed\|unreachable>` |
 | `doctor` | `checks=<n> warn=<n>` |
+
+`add`'s verification is the whole point of the sub-command — a passwordless
+`ssh <alias>` check that failed is a `[FAIL]`, never an `[OK]` with
+`verified=no`: `[FAIL] devenv:ssh-delegate cmd=add alias=<alias>
+reason=verify-failed`. `--dry-run` runs no verification at all, so it never
+carries a `verified` field either way — see the `add` section below.
+
+**`list --json` never gets a closing verdict line** (`SKILL.md` Step 3): its
+stdout is a machine-readable contract, and appending text after the JSON
+array would break a caller parsing it.
 
 **`[ALERT]` is terminal.** When `sync` reports a fingerprint MISMATCH, report
 that ALERT and stop. Do not write a closing verdict line for it, do not
@@ -78,6 +88,17 @@ strings. The column headers above are the display names of these fields:
 [..] installing key on bwyoon@10.0.0.1:22 (password prompt once)
 [OK] ssh gpu1-bwyoon now works passwordless
 ```
+```
+[OK] devenv:ssh-delegate cmd=add alias=gpu1-bwyoon state=active verified=yes
+```
+
+The key install can succeed while the passwordless check still fails (a
+stale `authorized_keys` permission, a second `IdentityFile` taking priority);
+that is a `[FAIL]`, not an `[OK]` with `verified=no`:
+
+```
+[FAIL] devenv:ssh-delegate cmd=add alias=gpu1-bwyoon reason=verify-failed
+```
 
 `--dry-run` touches neither the remote nor the manifest:
 
@@ -86,6 +107,9 @@ strings. The column headers above are the display names of these fields:
 [..] manifest upsert: alias=gpu1-bwyoon user=bwyoon host=10.0.0.1 identity_file=/home/you/.ssh/id_ed25519
 [..] would run: ssh-copy-id -i "/home/you/.ssh/id_ed25519.pub" -p 22 bwyoon@10.0.0.1
 [..] would regenerate /home/you/.ssh/config.d/devx-delegations and verify 'gpu1-bwyoon'
+```
+```
+[OK] devenv:ssh-delegate cmd=add alias=gpu1-bwyoon state=dry-run
 ```
 
 With no TTY, `add` refuses and prints the command to run instead — relay those
