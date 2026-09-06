@@ -72,19 +72,21 @@ skill's directory):
 
 ## Step 3: Report
 
-Relay the script's output, then close with one verdict line. `lib/ux.sh` owns
-the vocabulary (`[OK]` `[..]` `[WARN]` `[FAIL]` `[ALERT]`); per-sub-command
-examples live in `references/output-format.md`.
+Relay the script's output — `lib/ux.sh` prints `[OK]` `[..]` `[WARN]` `[FAIL]`
+`[ALERT]` — then add one closing verdict line of your own. The script does not
+print this line; its per-sub-command fields are tabled in
+`references/output-format.md`.
 
 ```
-[OK]   devenv:ssh-delegate cmd=<sub> alias=<alias> state=<active|revoked> verified=<yes|no>
-[FAIL] devenv:ssh-delegate cmd=<sub> alias=<alias> reason=<one-line>
+[OK]   devenv:ssh-delegate cmd=<sub-command> <field>=<value> ...
+[FAIL] devenv:ssh-delegate cmd=<sub-command> reason=<one-line>
 ```
 
-An `[ALERT]` from `sync` is terminal: report it and stop, never downgrade it to
-`[FAIL]` and continue. After `add` confirm `ssh <alias>` works passwordless;
-after `revoke` that the entry reads `state=revoked` (or warn on an unreachable
-host — `references/revoke-runbook.md`).
+A fingerprint MISMATCH `[ALERT]` from `sync` is terminal: report the ALERT and
+stop the run. Write no verdict line for it, and never restate it as `[FAIL]`.
+After `add` confirm `ssh <alias>` works passwordless; after `revoke` that the
+entry reads `state=revoked` (or warn on an unreachable host —
+`references/revoke-runbook.md`).
 
 ## References
 
