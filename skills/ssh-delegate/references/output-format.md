@@ -122,8 +122,8 @@ The one output that must never be papered over:
 [ALERT] gpu1-bwyoon: host fingerprint changed — sync ABORTED (no auto re-trust)
 ```
 
-Report it verbatim and stop. Do not re-run `sync`, do not `add` over it, and do
-not remove the pin to make it pass.
+This is the general `[ALERT]` rule above, applied here: do not re-run `sync`,
+do not `add` over it, and do not remove the pin to make it pass.
 
 ## `doctor`
 

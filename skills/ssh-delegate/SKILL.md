@@ -73,14 +73,9 @@ skill's directory):
 ## Step 3: Report
 
 Relay the script's output — `lib/ux.sh` prints `[OK]` `[..]` `[WARN]` `[FAIL]`
-`[ALERT]` — then add one closing verdict line of your own. The script does not
-print this line; its per-sub-command fields are tabled in
-`references/output-format.md`.
-
-```
-[OK]   devenv:ssh-delegate cmd=<sub-command> <field>=<value> ...
-[FAIL] devenv:ssh-delegate cmd=<sub-command> reason=<one-line>
-```
+`[ALERT]` — then add one closing `[OK]`/`[FAIL]` verdict line of your own. The
+script does not print this line; its exact shape and per-sub-command fields
+are in `references/output-format.md`.
 
 An `[ALERT]` is terminal (Step 2): no verdict line, never restated as `[FAIL]`.
 After `add` confirm `ssh <alias>` works passwordless; after `revoke` that the
