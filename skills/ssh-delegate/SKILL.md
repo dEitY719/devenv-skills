@@ -61,8 +61,10 @@ skill's directory):
 <skill-dir>/lib/ssh_delegate.sh <sub-command> [args...]
 ```
 
-- `add` needs a TTY for its one `ssh-copy-id` password prompt. Without one it
-  fails fast printing the exact command to run in a real terminal — relay that
+- `add` needs a TTY for its one `ssh-copy-id` password prompt, unless
+  `SSH_ASKPASS` + `SSH_ASKPASS_REQUIRE=force` are set for non-interactive use
+  (`references/help.md`). Without a TTY and without that override, it fails
+  fast printing the exact command to run in a real terminal — relay that
   verbatim; never try to supply the password (dEitY719/dotfiles#1132).
 - If the alias already pins a different `IdentityFile`, `add` adopts that key
   via `ssh -G` — surface the adoption warning it prints.
@@ -73,9 +75,12 @@ skill's directory):
 ## Step 3: Report
 
 Relay the script's output — `lib/ux.sh` prints `[OK]` `[..]` `[WARN]` `[FAIL]`
-`[ALERT]` — then add one closing `[OK]`/`[FAIL]` verdict line of your own. The
-script does not print this line; its exact shape and per-sub-command fields
-are in `references/output-format.md`.
+`[ALERT]` — then add one closing `[OK]`/`[FAIL]` verdict line of your own,
+**except for `list --json`**: that output is a machine-readable contract
+(`references/output-format.md`), and appending anything after it would break
+a caller parsing it as JSON. The script does not print the verdict line for
+the other sub-commands; its exact shape and per-sub-command fields are in
+`references/output-format.md`.
 
 An `[ALERT]` is terminal (Step 2): no verdict line, never restated as `[FAIL]`.
 After `add` confirm `ssh <alias>` works passwordless; after `revoke` that the
