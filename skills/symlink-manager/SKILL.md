@@ -45,8 +45,9 @@ refuses a missing category dir — `mkdir -p` first (only `bash/env/` exists tod
 
 ### Phase 0: Analysis (ALWAYS)
 
-Identify target file, determine category, locate management script, plan paths.
-Read `references/implementation-commands.md` for exact bash commands.
+Identify target file, determine category, locate management script, plan paths,
+and announce the plan before any change. Read `references/implementation-commands.md`
+for exact bash commands.
 
 ### Phase 1: File Migration (SEQUENTIAL)
 
