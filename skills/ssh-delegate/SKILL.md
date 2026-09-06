@@ -7,6 +7,9 @@ description: >-
   가능한지", "delegate ssh access", "revoke ssh key from host".
 allowed-tools: Bash, Read, Grep
 license: MIT
+compatibility:
+  # ssh, ssh-copy-id, ssh-keyscan, ssh-keygen all reach the remote host.
+  network: required
 metadata:
   model_recommendation:
     tier: haiku
@@ -58,38 +61,35 @@ skill's directory):
 <skill-dir>/lib/ssh_delegate.sh <sub-command> [args...]
 ```
 
-- `add` runs `ssh-copy-id` interactively — the user enters the remote password
-  **once**. Tell them to expect that single prompt; do not try to supply it. In
-  a non-interactive shell (a Claude `!` session) `add` fails fast with the exact
-  command to run in a real terminal — relay it verbatim (dEitY719/dotfiles#1132).
-- If the alias already has a hand-written `Host` block with a different
-  `IdentityFile`, `add` adopts that key (via `ssh -G`) so the installed key is
-  the one ssh actually offers — surface the adoption warning it prints.
-- `add --dry-run` prints the planned actions (manifest upsert, `ssh-copy-id`
-  command, config regen, verify) without touching the remote — use it first
-  when the user is unsure.
-- `add --key-only` installs the key without regenerating the ssh config drop-in
-  — for a host that already has a working hand-written alias (dEitY719/dotfiles#1132).
+- `add` needs a TTY for its one `ssh-copy-id` password prompt. Without one it
+  fails fast printing the exact command to run in a real terminal — relay that
+  verbatim; never try to supply the password (dEitY719/dotfiles#1132).
+- If the alias already pins a different `IdentityFile`, `add` adopts that key
+  via `ssh -G` — surface the adoption warning it prints.
 - Never bypass a fingerprint MISMATCH from `sync`. Surface the ALERT and stop;
-  re-trust is a human decision (see `references/safety-model.md`).
+  re-trust is a human decision (`references/safety-model.md`).
+- Flags (`--dry-run`, `--key-only`, `--json`, `--all`): `references/help.md`.
 
 ## Step 3: Report
 
-Relay the script's output. After `add`, confirm `ssh <alias>` now works
-passwordless. After `revoke`, confirm the entry shows `state=revoked` and the
-remote key was removed (or warn if the host was unreachable —
-`references/revoke-runbook.md`).
+Relay the script's output, then close with one verdict line. `lib/ux.sh` owns
+the vocabulary (`[OK]` `[..]` `[WARN]` `[FAIL]` `[ALERT]`); per-sub-command
+examples live in `references/output-format.md`.
 
-## Idempotency & safety
+```
+[OK]   devenv:ssh-delegate cmd=<sub> alias=<alias> state=<active|revoked> verified=<yes|no>
+[FAIL] devenv:ssh-delegate cmd=<sub> alias=<alias> reason=<one-line>
+```
 
-- Re-running `add` for an existing alias is a no-op beyond refreshing
-  `last_verified_at` — never a duplicate entry.
-- The manifest and config drop-in are always written mode 0600.
-- Every event is appended to the JSONL audit log (`flock`-serialized).
+An `[ALERT]` from `sync` is terminal: report it and stop, never downgrade it to
+`[FAIL]` and continue. After `add` confirm `ssh <alias>` works passwordless;
+after `revoke` that the entry reads `state=revoked` (or warn on an unreachable
+host — `references/revoke-runbook.md`).
 
 ## References
 
-- `references/help.md` — verbatim help / usage.
+- `references/help.md` — verbatim help / usage, flags, env overrides.
+- `references/output-format.md` — output + verdict examples per sub-command.
 - `references/manifest-schema.md` — manifest fields + parser-engine note.
 - `references/safety-model.md` — the 3-layer trust model.
 - `references/revoke-runbook.md` — revoke + unreachable-host recovery.
