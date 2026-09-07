@@ -31,7 +31,7 @@ set -u
 # uv folds those deps into pyproject.toml, so the file reference is stale too.
 ERE='python -m venv|python3 -m venv|pip install|\.venv/bin/activate|\.\[dev\]|setuptools|requirements\.txt'
 
-# A literal newline, for the path-safety guard in scan().
+# A literal newline, for the newline-path fixture in self_test().
 _NL=$(printf '\nx'); _NL=${_NL%x}
 
 usage() {
@@ -49,19 +49,6 @@ and *plan*.md / *spec*.md / *design*.md.
 EOF
 }
 
-# History, not live instructions: these are expected to describe the old flow.
-is_excluded() {
-    p=$1
-    case "/$p" in
-        */archive/*|*/_archive/*|*/.venv/*|*/decisions/*) return 0 ;;
-    esac
-    case "${p##*/}" in
-        CHANGELOG*|mise.toml|uv.lock) return 0 ;;
-        *plan*.md|*spec*.md|*design*.md) return 0 ;;
-    esac
-    return 1
-}
-
 scan() {
     root=${1%/}
     [ -n "$root" ] || root=/
@@ -70,57 +57,88 @@ scan() {
         return 2
     fi
 
-    # A newline inside a filename -- POSIX permits one -- would split a single
-    # path into two in the list below, and the halves would neither match the
-    # exclusion globs nor re-grep, so its hits would vanish from a scan that
-    # still reported excluded=0 and exit 0. Refuse instead: under-reporting
-    # while claiming a complete scan is the exact failure this step exists to
-    # catch one level up.
-    if find "$root" -name "*${_NL}*" -print 2>/dev/null | grep -q .; then
-        printf 'stale_scan.sh: a path under %s contains a newline -- scan refused\n' "$root" >&2
+    # `find ... -exec sh -c '...' sh {} +` hands matched pathnames straight
+    # to argv, batched but never round-tripped through a line-oriented
+    # stream the way `grep -rl | while read` or a `find | while read` pipe
+    # is -- a literal newline (POSIX permits one) inside a filename can't
+    # split one path into two here, so there is nothing left to refuse.
+    #
+    # Each `+` batch runs in its own child `sh -c` process, so state that
+    # must survive across batches (the excluded-hit count, whether any grep
+    # call errored) lives in files, not a shell variable.
+    excl_file=$(mktemp) || excl_file=
+    err_file=$(mktemp) || err_file=
+    if [ -z "$excl_file" ] || [ -z "$err_file" ]; then
+        printf 'stale_scan.sh: mktemp failed\n' >&2
+        rm -f "${excl_file:-}" "${err_file:-}"
+        return 2
+    fi
+    printf '0\n' > "$excl_file"
+
+    # -name .git -prune excludes any dir literally named .git at any depth,
+    # same as the old --exclude-dir=.git.
+    find "$root" -name .git -prune -o -type f -exec sh -c '
+        ere=$1; shift
+        excl_file=$1; shift
+        err_file=$1; shift
+        root=$1; shift
+        # Duplicated from the top-level exclusion rules rather than shared:
+        # this body runs in a separate sh -c child, and POSIX sh has no way
+        # to export a function into it.
+        is_excluded() {
+            p=$1
+            case "/$p" in
+                */archive/*|*/_archive/*|*/.venv/*|*/decisions/*) return 0 ;;
+            esac
+            case "${p##*/}" in
+                CHANGELOG*|mise.toml|uv.lock) return 0 ;;
+                *plan*.md|*spec*.md|*design*.md) return 0 ;;
+            esac
+            return 1
+        }
+        for f in "$@"; do
+            rel=${f#"$root"}
+            rel=${rel#/}
+            if is_excluded "$rel"; then
+                # Count lines, do not print them.
+                n=$(grep -cEI -e "$ere" -- "$f")
+                rc=$?
+                if [ "$rc" -ge 2 ]; then
+                    printf x >> "$err_file"
+                else
+                    cur=$(cat "$excl_file")
+                    echo $((cur + n)) > "$excl_file"
+                fi
+            else
+                out=$(grep -nEI -e "$ere" -- "$f")
+                rc=$?
+                # 0 = matches, 1 = none, >=2 = a real error (an unreadable
+                # file, a bad ERE). Never swallowed: a scan that quietly
+                # skipped files and still reported success is exactly the
+                # silent regression this step exists to surface, one level up.
+                if [ "$rc" -ge 2 ]; then
+                    printf x >> "$err_file"
+                elif [ "$rc" -eq 0 ]; then
+                    printf "%s\n" "$out" | while IFS= read -r hit; do
+                        printf "%s:%s\n" "$f" "$hit"
+                    done
+                fi
+            fi
+        done
+    ' sh "$ERE" "$excl_file" "$err_file" "$root" {} +
+    find_rc=$?
+
+    # A nonzero find exit status means it could not even traverse part of
+    # the tree (e.g. a directory with no read/execute permission) -- those
+    # files never reached the loop above at all.
+    if [ "$find_rc" -ne 0 ] || [ -s "$err_file" ]; then
+        printf 'stale_scan.sh: scan incomplete under %s\n' "$root" >&2
+        rm -f "$excl_file" "$err_file"
         return 2
     fi
 
-    # Two passes on purpose. `grep -rl` prints one bare path per line, so the
-    # exclusion decision never has to split a `path:line:text` record at the
-    # first `:` -- a path that contains a colon would be truncated by that
-    # split and silently escape the history/archive filter. The second pass
-    # re-greps only the files that survive, and the `:` in the printed record
-    # is then ours, not something we had to parse back out.
-    # -I skips binaries; .git is never live instructions.
-    files=$(grep -rlEI --exclude-dir=.git -e "$ERE" -- "$root")
-    rc=$?
-    # 0 = matches, 1 = none, >=2 = a real error (an unreadable path, a bad
-    # ERE). Never swallowed: a scan that quietly skipped files and still
-    # reported success is exactly the silent regression this step exists to
-    # surface, one level up.
-    if [ "$rc" -ge 2 ]; then
-        printf 'stale_scan.sh: grep failed (rc=%s) -- scan incomplete\n' "$rc" >&2
-        return 2
-    fi
-
-    excluded=0
-    # Here-doc, not a pipe: a pipeline would run this loop in a subshell and
-    # $excluded would not survive it.
-    while IFS= read -r f; do
-        [ -n "$f" ] || continue
-        rel=${f#"$root"}
-        rel=${rel#/}
-        if is_excluded "$rel"; then
-            # Count lines, do not print them. rc>=2 is unreachable -- the
-            # first pass already read this same file -- so a bare fallback is
-            # enough here.
-            n=$(grep -cEI -e "$ERE" -- "$f") || n=0
-            excluded=$((excluded + n))
-        else
-            grep -nEI -e "$ERE" -- "$f" | while IFS= read -r hit; do
-                printf '%s:%s\n' "$f" "$hit"
-            done
-        fi
-    done <<EOF
-$files
-EOF
-
+    excluded=$(cat "$excl_file")
+    rm -f "$excl_file" "$err_file"
     printf 'excluded=%s\n' "$excluded"
     return 0
 }
@@ -177,16 +195,22 @@ self_test() {
         printf 'ok    clean file not reported\n'
     fi
 
-    # A newline in a path must fail the scan, not silently drop that file.
+    # A newline in a path (POSIX permits one) must be scanned and reported
+    # intact, not refused and not split into two bogus entries. Compare with
+    # embedded newlines folded to a sentinel byte, so the check itself does
+    # not care whether the record prints across two terminal lines -- only
+    # that the file's full name and its hit are one unbroken substring.
     nlfile="$tmp/two${_NL}lines.md"
     printf 'pip install\n' > "$nlfile"
-    scan "$tmp" >/dev/null 2>&1
+    out=$(scan "$tmp")
     rc=$?
     rm -f "$nlfile"
-    if [ "$rc" -eq 2 ]; then
-        printf 'ok    newline in a path refuses the scan (rc=2)\n'
+    want=$(printf '%s:1:pip install' "$nlfile" | tr '\n' '\001')
+    got=$(printf '%s' "$out" | tr '\n' '\001')
+    if [ "$rc" -eq 0 ] && printf '%s' "$got" | grep -Fq "$want"; then
+        printf 'ok    newline in a path is scanned and reported intact\n'
     else
-        printf 'FAIL  newline in a path scanned anyway (rc=%s)\n' "$rc"; fail=1
+        printf 'FAIL  newline-path hit missing or split (rc=%s):\n%s\n' "$rc" "$out"; fail=1
     fi
 
     # An unreadable path must fail the scan, not pass it quietly. Skipped as
