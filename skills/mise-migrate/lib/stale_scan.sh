@@ -96,6 +96,10 @@ scan() {
             esac
             return 1
         }
+        # A plain variable is enough here -- this whole for loop runs in one
+        # sh -c child for the batch, so the count only needs to reach the
+        # shared file once, after the loop, not once per excluded file.
+        excl=0
         for f in "$@"; do
             rel=${f#"$root"}
             rel=${rel#/}
@@ -106,8 +110,7 @@ scan() {
                 if [ "$rc" -ge 2 ]; then
                     printf x >> "$err_file"
                 else
-                    cur=$(cat "$excl_file")
-                    echo $((cur + n)) > "$excl_file"
+                    excl=$((excl + n))
                 fi
             else
                 out=$(grep -nEI -e "$ere" -- "$f")
@@ -125,6 +128,10 @@ scan() {
                 fi
             fi
         done
+        if [ "$excl" -gt 0 ]; then
+            cur=$(cat "$excl_file")
+            echo $((cur + excl)) > "$excl_file"
+        fi
     ' sh "$ERE" "$excl_file" "$err_file" "$root" {} +
     find_rc=$?
 
