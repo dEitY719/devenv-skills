@@ -57,95 +57,86 @@ scan() {
         return 2
     fi
 
-    # `find ... -exec sh -c '...' sh {} +` hands matched pathnames straight
-    # to argv, batched but never round-tripped through a line-oriented
-    # stream the way `grep -rl | while read` or a `find | while read` pipe
-    # is -- a literal newline (POSIX permits one) inside a filename can't
-    # split one path into two here, so there is nothing left to refuse.
-    #
-    # Each `+` batch runs in its own child `sh -c` process, so state that
-    # must survive across batches (the excluded-hit count, whether any grep
-    # call errored) lives in files, not a shell variable.
+    # Bulk NUL-delimited first pass, same as the old `grep -rlEI`: only
+    # files that actually contain a hit are ever touched again, so this
+    # keeps the original single-scan efficiency instead of spawning a grep
+    # per file in the whole tree. `-Z` NUL-terminates each printed
+    # pathname -- unlike the newline it normally prints between paths, a
+    # literal newline (POSIX permits one) inside a filename can't be
+    # mistaken for the separator. `xargs -0` then hands those names to the
+    # classify/print step's argv exactly like `find -exec ... {} +` would:
+    # batched, but never round-tripped through a line-oriented stream.
+    # -I skips binaries; .git is never live instructions.
+    filelist=$(mktemp) || filelist=
     excl_file=$(mktemp) || excl_file=
-    err_file=$(mktemp) || err_file=
-    if [ -z "$excl_file" ] || [ -z "$err_file" ]; then
+    if [ -z "$filelist" ] || [ -z "$excl_file" ]; then
         printf 'stale_scan.sh: mktemp failed\n' >&2
-        rm -f "${excl_file:-}" "${err_file:-}"
+        rm -f "${filelist:-}" "${excl_file:-}"
         return 2
     fi
-    printf '0\n' > "$excl_file"
+    grep -rlZEI --exclude-dir=.git -e "$ERE" -- "$root" > "$filelist"
+    grc=$?
+    # 0 = matches, 1 = none, >=2 = a real error (an unreadable path, a bad
+    # ERE, a directory grep couldn't even traverse). Never swallowed: a scan
+    # that quietly skipped files and still reported success is exactly the
+    # silent regression this step exists to surface, one level up.
+    if [ "$grc" -ge 2 ]; then
+        printf 'stale_scan.sh: grep failed (rc=%s) -- scan incomplete\n' "$grc" >&2
+        rm -f "$filelist" "$excl_file"
+        return 2
+    fi
 
-    # -name .git -prune excludes any dir literally named .git at any depth,
-    # same as the old --exclude-dir=.git.
-    find "$root" -name .git -prune -o -type f -exec sh -c '
-        ere=$1; shift
-        excl_file=$1; shift
-        err_file=$1; shift
-        root=$1; shift
-        # Duplicated from the top-level exclusion rules rather than shared:
-        # this body runs in a separate sh -c child, and POSIX sh has no way
-        # to export a function into it.
-        is_excluded() {
-            p=$1
-            case "/$p" in
-                */archive/*|*/_archive/*|*/.venv/*|*/decisions/*) return 0 ;;
-            esac
-            case "${p##*/}" in
-                CHANGELOG*|mise.toml|uv.lock) return 0 ;;
-                *plan*.md|*spec*.md|*design*.md) return 0 ;;
-            esac
-            return 1
-        }
-        # A plain variable is enough here -- this whole for loop runs in one
-        # sh -c child for the batch, so the count only needs to reach the
-        # shared file once, after the loop, not once per excluded file.
-        excl=0
-        for f in "$@"; do
-            rel=${f#"$root"}
-            rel=${rel#/}
-            if is_excluded "$rel"; then
-                # Count lines, do not print them.
-                n=$(grep -cEI -e "$ere" -- "$f")
-                rc=$?
-                if [ "$rc" -ge 2 ]; then
-                    printf x >> "$err_file"
-                else
+    printf '0\n' > "$excl_file"
+    if [ "$grc" -eq 0 ]; then
+        # shellcheck disable=SC2016  # $ere/$excl_file/$root/$f are the child
+        # sh -c's own positional params, not meant to expand in this shell.
+        xargs -0 sh -c '
+            ere=$1; shift
+            excl_file=$1; shift
+            root=$1; shift
+            # Duplicated from the top-level exclusion rules rather than
+            # shared: this body runs in a separate sh -c child, and POSIX sh
+            # has no way to export a function into it.
+            is_excluded() {
+                p=$1
+                case "/$p" in
+                    */archive/*|*/_archive/*|*/.venv/*|*/decisions/*) return 0 ;;
+                esac
+                case "${p##*/}" in
+                    CHANGELOG*|mise.toml|uv.lock) return 0 ;;
+                    *plan*.md|*spec*.md|*design*.md) return 0 ;;
+                esac
+                return 1
+            }
+            # A plain variable is enough here -- this whole for loop runs in
+            # one sh -c child for the batch, so the count only needs to
+            # reach the shared file once, after the loop, not once per
+            # excluded file.
+            excl=0
+            for f in "$@"; do
+                rel=${f#"$root"}
+                rel=${rel#/}
+                if is_excluded "$rel"; then
+                    # Count lines, do not print them. rc>=2 is unreachable --
+                    # the first pass already read this same file -- so a
+                    # bare fallback is enough here.
+                    n=$(grep -cEI -e "$ere" -- "$f") || n=0
                     excl=$((excl + n))
-                fi
-            else
-                out=$(grep -nEI -e "$ere" -- "$f")
-                rc=$?
-                # 0 = matches, 1 = none, >=2 = a real error (an unreadable
-                # file, a bad ERE). Never swallowed: a scan that quietly
-                # skipped files and still reported success is exactly the
-                # silent regression this step exists to surface, one level up.
-                if [ "$rc" -ge 2 ]; then
-                    printf x >> "$err_file"
-                elif [ "$rc" -eq 0 ]; then
-                    printf "%s\n" "$out" | while IFS= read -r hit; do
+                else
+                    grep -nEI -e "$ere" -- "$f" | while IFS= read -r hit; do
                         printf "%s:%s\n" "$f" "$hit"
                     done
                 fi
+            done
+            if [ "$excl" -gt 0 ]; then
+                cur=$(cat "$excl_file")
+                echo $((cur + excl)) > "$excl_file"
             fi
-        done
-        if [ "$excl" -gt 0 ]; then
-            cur=$(cat "$excl_file")
-            echo $((cur + excl)) > "$excl_file"
-        fi
-    ' sh "$ERE" "$excl_file" "$err_file" "$root" {} +
-    find_rc=$?
-
-    # A nonzero find exit status means it could not even traverse part of
-    # the tree (e.g. a directory with no read/execute permission) -- those
-    # files never reached the loop above at all.
-    if [ "$find_rc" -ne 0 ] || [ -s "$err_file" ]; then
-        printf 'stale_scan.sh: scan incomplete under %s\n' "$root" >&2
-        rm -f "$excl_file" "$err_file"
-        return 2
+        ' sh "$ERE" "$excl_file" "$root" < "$filelist"
     fi
 
     excluded=$(cat "$excl_file")
-    rm -f "$excl_file" "$err_file"
+    rm -f "$filelist" "$excl_file"
     printf 'excluded=%s\n' "$excluded"
     return 0
 }
