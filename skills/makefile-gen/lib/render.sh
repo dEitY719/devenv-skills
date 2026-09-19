@@ -96,9 +96,10 @@ render() { # <path> -> sets BODY, NAMES, REPORT, VARS
         r "mise run setup"
     elif [ -n "$PY$JS" ]; then
         _v=$(printf '%s' "$PYV" | cut -d. -f1,2)
-        _pd=""; [ -n "$PY" ] && _pd=" .venv${_v:+ (Python $_v)} +"
-        target setup "" "$(L "최초 1회:$_pd 의존성 설치" "First-time setup:$_pd install dependencies")" \
-            "${PY:+${PYREQS:-pyproject.toml}${_v:+ + .python-version}}${PY:+${JS:+ + }}${JS:+package.json}"
+        _pd=""; _s=""
+        [ -n "$PY" ] && { _pd=" .venv${_v:+ (Python $_v)} +"; _s="${PYREQS:-pyproject.toml}${_v:+ + .python-version}"; }
+        [ -n "$JS" ] && _s="${_s:+$_s + }package.json"
+        target setup "" "$(L "최초 1회:$_pd 의존성 설치" "First-time setup:$_pd install dependencies")" "$_s"
         if [ "$PY" = uv ]; then r "uv sync"
         elif [ -n "$PY" ]; then
             if [ -n "$_v" ]; then
@@ -143,7 +144,6 @@ render() { # <path> -> sets BODY, NAMES, REPORT, VARS
     if [ "$RKIND" = script ]; then
         _sp=${SCRIPT%%|*}
         SCMD="${PORTVAR:+$PORTVAR=\$(PORT) }${SCRIPT##*|} ./$_sp"
-        [ -n "$PORT" ] || SCMD="${SCRIPT##*|} ./$_sp"
     fi
     GUARD=""
     for _a in $ARTS; do case "$_a" in */dist|dist|*/build|build|*/out|out|*/.next|.next) GUARD=$_a; break ;; esac; done
@@ -156,8 +156,8 @@ render() { # <path> -> sets BODY, NAMES, REPORT, VARS
             if [ "$BUILD_REAL" = 1 ]; then
                 target run "build serve" "$(L '빌드 후 서버 (재)기동 -- 코드를 바꿨으면 이것' 'Build, then (re)start the server')" "build + serve"
                 target serve "" "$(L '빌드 없이 서버 (재)기동 -- 산출물이 없으면 멈춘다' '(Re)start the server without building; stops if the build output is missing')" "$_sp"
-                [ -n "$GUARD" ] && r "@test -e $GUARD || { echo \"$(L "$GUARD 없음 -- 먼저 make build" "$GUARD missing -- run make build first")\"; exit 1; }"
-                [ -n "$GUARD" ] || skip serve-guard "no allowlisted build output dir detected"
+                if [ -n "$GUARD" ]; then r "@test -e $GUARD || { echo \"$(L "$GUARD 없음 -- 먼저 make build" "$GUARD missing -- run make build first")\"; exit 1; }"
+                else skip serve-guard "no allowlisted build output dir detected"; fi
                 r "$SCMD"
             else
                 target run "" "$(L '서버 (재)기동' '(Re)start the server')" "$_sp"; r "$SCMD"

@@ -41,7 +41,7 @@ ignored() {
     _base=${2##*/}
     _par=${2%/*}; [ "$_par" = "$2" ] && _par=.
     for _gi in "$1/.gitignore" "$1/$_par/.gitignore"; do
-        [ -f "$_gi" ] || continue
+        [ "$_gi" != "$1/./.gitignore" ] && [ -f "$_gi" ] || continue
         sed -e 's/[[:space:]]*$//' -e 's|^\*\*/||' -e 's|^/||' -e 's|/$||' "$_gi" \
             | grep -qxF -e "$2" -e "$_base" && return 0
     done
@@ -105,7 +105,7 @@ detect() {
         add "js=$d|$RUNNER|$(pkg_scripts "$root/$d/package.json")"; found=1
     done
 
-    py=""
+    py=""; pyt=""
     [ -f "$root/pyproject.toml" ] || [ -f "$root/setup.py" ] && py=pip
     for f in "$root"/requirements*.txt; do [ -f "$f" ] && py=pip; done
     [ -n "$py" ] && [ -f "$root/uv.lock" ] && py=uv
@@ -118,7 +118,7 @@ detect() {
         pyfiles=$(ls "$root"/pyproject.toml "$root"/requirements*.txt 2>/dev/null)
         if [ -f "$root/pytest.ini" ] || [ -f "$root/conftest.py" ] \
             || { [ -n "$pyfiles" ] && grep -qE 'pytest' $pyfiles; }; then
-            add "py_test=pytest"
+            add "py_test=pytest"; pyt=1
         fi
         if [ -f "$root/ruff.toml" ] || [ -f "$root/.ruff.toml" ] \
             || { [ -n "$pyfiles" ] && grep -qE '(^|[^a-z])ruff' $pyfiles; }; then
@@ -160,7 +160,7 @@ detect() {
             rel=$a; [ "$d" = . ] || rel="$d/$a"
             case "$a" in __pycache__) [ "$d" = . ] || continue ;; esac
             if ignored "$root" "$rel"; then add "artifact=$rel"
-            elif [ "$rel" = .pytest_cache ] && printf '%s' "$out" | grep -q '^py_test='; then
+            elif [ "$rel" = .pytest_cache ] && [ -n "$pyt" ]; then
                 add "artifact=$rel"
             fi
         done

@@ -33,9 +33,8 @@ bug. `detect.sh --help` prints the key list.
 
 ## Artifacts: allowlist x .gitignore
 
-`clear` may only ever delete these names, at the root or inside a JS app dir:
-`dist build out coverage .pytest_cache __pycache__ test-results
-playwright-report target .next .turbo`. A name is emitted only when the root
+`clear` may only ever delete the names in `ALLOW` at the top of
+`lib/detect.sh`, at the root or inside a JS app dir. A name is emitted only when the root
 `.gitignore` or the app dir's own `.gitignore` lists it (leading `/`, `**/`
 and trailing `/` are ignored when matching). `.pytest_cache` is also emitted
 whenever pytest is detected, because pytest writes its own `.gitignore` into
