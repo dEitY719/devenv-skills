@@ -250,7 +250,7 @@ render() { # <path> -> sets BODY, NAMES, REPORT, VARS
     target clear "" "$(L '빌드·테스트 산출물 정리(의존성·비밀·데이터는 남긴다)' 'Remove build/test artifacts (keeps dependencies, secrets, data)')" "allowlist x .gitignore"
     _rm=""; _pyc=""
     for _a in $ARTS; do [ "$_a" = __pycache__ ] && _pyc=1 || _rm="$_rm $_a"; done
-    [ -n "$_rm" ] && r "rm -rf$_rm"
+    [ -n "$_rm" ] && r "rm -rf ${_rm# }"
     [ -n "$_pyc" ] && r "find . -path '*/.*' -prune -o -name node_modules -prune -o -type d -name __pycache__ -prune -exec rm -rf {} +"
     [ -n "$_rm$_pyc" ] || r "@echo \"$(L '정리할 산출물 없음' 'nothing to clear')\""
     target clean clear "$(L 'clear 와 같다' 'Same as clear')" "alias of clear"

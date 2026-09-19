@@ -76,11 +76,11 @@ Stop at the first failure with `[FAIL] devenv:makefile-gen <reason>` + exit 1:
 
 1. `makefile=present` without `--force` → refuse; write nothing. The skill
    never merges into an existing Makefile (`references/constraints.md`).
-2. Render into a temp file and run `sh render.sh --check <tmp>`; a failure
+2. Render into a temp file and run `sh <skill-dir>/lib/render.sh --check <tmp>`; a failure
    means the renderer broke its own contract — report it, write nothing.
 3. With `--force` and an existing Makefile, `cp Makefile Makefile.bak`.
 4. Copy the temp file to `<path>/Makefile`.
-5. Verify: `sh render.sh --verify <path>` runs `make` (help must list every
+5. Verify: `sh <skill-dir>/lib/render.sh --verify <path>` runs `make` (help must list every
    `.PHONY` target) and `make -n <t>` for each. It never runs `run`, `stop`,
    `build` for real. On failure, restore `Makefile.bak` (or delete the new
    Makefile if none existed) and report the failing targets.

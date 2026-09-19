@@ -44,7 +44,8 @@
 
 - GNU Make 3.81+ and POSIX `sh` recipes (`references/template.md`).
 - `stop` / `status` use `fuser` (Linux psmisc). On macOS without it, they
-  print the "not running" branch; the report should say so.
+  print the "not running" branch; the report should say so, and point the
+  user at `lsof -ti tcp:<port> | xargs kill` as the manual equivalent.
 - Windows `nmake` / `cmd` are not targets.
 
 ## Out of scope (refuse / skip, don't improvise)
