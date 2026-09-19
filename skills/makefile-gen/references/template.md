@@ -30,7 +30,9 @@ clear: ## Remove build/test artifacts (keeps dependencies, secrets, data)
 clean: clear ## Same as clear
 ```
 
-The variable block is emitted only as needed: `PORT` with a server port,
+The variable block is emitted only as needed: `PORT` with a server port
+(`PORTS ?= N M` instead when the run script starts several servers; `PORT`
+then stays only if the run command or `LOG` uses it),
 `PY` for a pip/venv Python project, `LOG` with a log path. No trailing
 comments on variable lines -- Make keeps the whitespace before `#` in the
 value.
@@ -53,7 +55,8 @@ value.
   serve`, `test-all: test test-e2e`); `make -n` executes `$(MAKE)` lines,
   which would break the no-side-effect verification.
 - **Aliases are dependencies**: `clean: clear ## Same as clear`.
-- **`stop` is port-based** (`fuser $(PORT)/tcp`) or the run script's own
+- **`stop` is port-based** (`fuser $(PORT)/tcp`, or `fuser $$p/tcp` inside
+  `for p in $(PORTS); do ...; done`) or the run script's own
   teardown (`<bash|sh> ./<script> stop|down`); `pkill` / `killall` are
   rejected anywhere in the file.
 - **`clear` never names `.env*`, `node_modules`, `.venv`, `.git` or a
