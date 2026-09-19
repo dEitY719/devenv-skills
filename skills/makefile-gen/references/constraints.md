@@ -18,8 +18,8 @@
   `node_modules` (possibly a symlink to a shared store), `.venv`, `.git`
   or runtime data such as `web/data`. The `__pycache__` sweep prunes every
   dot-directory and `node_modules` before it looks.
-- **Port, not name.** `stop` kills whatever holds `:$(PORT)` and nothing
-  else. A name or env match also hits sibling processes; brokerdesk's
+- **Port, not name.** `stop` kills whatever holds `:$(PORT)` (each of `$(PORTS)`
+  when the run script starts several servers) and nothing else. A name or env match also hits sibling processes; brokerdesk's
   scheduler inherits `WEB_PORT` from the web server, so a name-based stop
   killed running strategies.
 - **Verification has no side effects.** `--verify` runs `make` (help only)

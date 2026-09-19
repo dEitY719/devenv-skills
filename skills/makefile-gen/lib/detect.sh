@@ -19,7 +19,11 @@
 #                                   Python and/or mise.toml in an immediate
 #                                   subdir (only when the root has no Python)
 #   script=<rel>|<bash|sh>          (repeat) run-*.sh, scripts/{dev,start,run}.sh
-#   port=<n>  port_var=<NAME>  log=<path>        from the first server script
+#   script_sub=<rel>|<bash|sh>|<test|lint|fmt>  (repeat) case arm in one of
+#                                   those scripts or tools/dev.sh; first wins
+#   port=<n>                        (repeat) every port in the first server
+#                                   script, then vite.config server.port
+#   port_var=<NAME>  log=<path>     from the first server script
 #   script_stop=<stop|down>         first script has that case arm (teardown)
 #   devserver=<signal>              first script starts a dev server (vite, ...)
 #   go=yes  cargo=yes  compose=<file>
@@ -35,20 +39,23 @@ set -u
 ALLOW='dist build out coverage .pytest_cache __pycache__ test-results playwright-report target .next .turbo'
 
 usage() {
-    sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 # ignored <root> <rel>: is <rel> matched by <root>/.gitignore or by the
-# .gitignore of its own parent dir? Plain-line matching after stripping the
-# leading `/`, `**/` and trailing `/` -- enough for the allowlist names.
+# .gitignore of its own parent dir? Plain-line matching after stripping a
+# leading `**/` and trailing `/`; a leading `/` anchors the line to the dir
+# of that .gitignore (root `/build` never matches `src/app/build`).
 # ponytail: no negation/glob semantics; swap for `git check-ignore` if needed.
 ignored() {
     _base=${2##*/}
     _par=${2%/*}; [ "$_par" = "$2" ] && _par=.
+    _an=/$2
     for _gi in "$1/.gitignore" "$1/$_par/.gitignore"; do
         [ "$_gi" != "$1/./.gitignore" ] && [ -f "$_gi" ] || continue
-        sed -e 's/[[:space:]]*$//' -e 's|^\*\*/||' -e 's|^/||' -e 's|/$||' "$_gi" \
-            | grep -qxF -e "$2" -e "$_base" && return 0
+        sed -e 's/[[:space:]]*$//' -e 's|^\*\*/||' -e 's|/$||' "$_gi" \
+            | grep -qxF -e "$2" -e "$_base" -e "$_an" && return 0
+        _an=/$_base
     done
     return 1
 }
@@ -72,6 +79,8 @@ mise_tasks() {
         [ -f "$_m" ] && sed -n 's/^\[tasks\.\"\{0,1\}\([A-Za-z0-9_:-]*\)\"\{0,1\}\][[:space:]]*$/\1/p' "$_m"
     done
 }
+# has_arm <script> <name>: a `name)` case arm (also `a|name)`, quoted).
+has_arm() { grep -qE "^[[:space:]]*\(?([^)]*\|)?[\"']?$2[\"']?(\|[^)]*)?\)" "$1"; }
 has_pytest() { [ -f "$1/pytest.ini" ] || [ -f "$1/conftest.py" ] || py_mentions "$1" 'pytest'; }
 has_ruff() { [ -f "$1/ruff.toml" ] || [ -f "$1/.ruff.toml" ] || py_mentions "$1" '(^|[^a-z])ruff'; }
 py_kind() { # <dir>: uv | pip | "" -- uv.lock alone is enough for uv
@@ -129,9 +138,11 @@ detect() {
 
     # A root package.json owns the workspace; sub-apps count only without one.
     if [ -f "$root/package.json" ]; then jsdirs=.
-    else jsdirs=""; for d in "$root"/frontend "$root"/apps/*; do
-        [ -f "$d/package.json" ] && jsdirs="$jsdirs ${d#"$root"/}"; done
-    fi
+    else jsdirs=""; for d in "$root"/*/ "$root"/apps/*/ "$root"/src/*/; do
+        d=${d%/}; case "$d" in */node_modules) continue ;; esac
+        [ -f "$d/package.json" ] || continue
+        case " $jsdirs " in *" ${d#"$root"/} "*) ;; *) jsdirs="$jsdirs ${d#"$root"/}" ;; esac
+    done; fi
     for d in $jsdirs; do
         runner_of "$root/$d" "$d"
         add "js=$d|$RUNNER|$(pkg_scripts "$root/$d/package.json")"; found=1
@@ -166,22 +177,23 @@ detect() {
         done
     fi
 
-    first=""
-    for s in "$root"/run-*.sh "$root"/scripts/dev.sh "$root"/scripts/start.sh "$root"/scripts/run.sh; do
+    first=""; subs=""
+    for s in "$root"/run-*.sh "$root"/scripts/dev.sh "$root"/scripts/start.sh "$root"/scripts/run.sh "$root"/tools/dev.sh; do
         [ -f "$s" ] || continue
         head -n1 "$s" | grep -q bash && sh_='bash' || sh_='sh'
-        add "script=${s#"$root"/}|$sh_"; found=1
-        [ -n "$first" ] || first=$s
+        # tools/dev.sh is a subcommand dispatcher, not a run script.
+        case "$s" in "$root"/tools/*) ;; *) add "script=${s#"$root"/}|$sh_"; found=1; [ -n "$first" ] || first=$s ;; esac
+        for a in test lint fmt; do
+            case " $subs " in *" $a "*) continue ;; esac
+            has_arm "$s" "$a" && { add "script_sub=${s#"$root"/}|$sh_|$a"; subs="$subs $a"; }
+        done
     done
+    ports=""
     if [ -n "$first" ]; then
-        pv=$(sed -n 's/.*\${\([A-Z_]*PORT\):-\([0-9][0-9]*\)}.*/\1 \2/p' "$first" | head -n1)
-        if [ -n "$pv" ]; then
-            add "port=${pv#* }"; add "port_var=${pv% *}"
-        else
-            p=$(sed -n -e 's/.*--port[= ]\([0-9][0-9]*\).*/\1/p' \
-                -e 's/.*PORT=\([0-9][0-9]*\).*/\1/p' "$first" | head -n1)
-            [ -n "$p" ] && add "port=$p"
-        fi
+        # Every port the script names: one run script may start several servers.
+        ports=$(grep -oE '\$\{[A-Z_]*PORT:-[0-9]+\}|[A-Z_]*PORT=[0-9]+|--port[= ][0-9]+' "$first" | grep -oE '[0-9]+')
+        pv=$(sed -n 's/.*\${\([A-Z_]*PORT\):-[0-9][0-9]*}.*/\1/p' "$first" | head -n1)
+        [ -n "$pv" ] && add "port_var=$pv"
         lg=$(sed -n 's/.*LOG:-\([^"'"'"' ]*\.log\).*/\1/p' "$first" | head -n1)
         [ -n "$lg" ] || lg=$(sed -n 's/.*>[[:space:]]*\(\/[^"'"'"' ]*\.log\).*/\1/p' "$first" | head -n1)
         [ -n "$lg" ] && add "log=$lg"
@@ -190,11 +202,14 @@ detect() {
         dv=$(grep -owE -e 'vite' -e 'run dev' -e 'next dev' -e 'webpack serve' -e '--reload' "$first" | head -n1)
         [ -n "$dv" ] && add "devserver=$dv"
         # Its own teardown subcommand: a `stop)` / `down)` case arm (stop first).
-        for a in stop down; do
-            grep -qE "^[[:space:]]*\(?([^)]*\|)?[\"']?${a}[\"']?(\|[^)]*)?\)" "$first" \
-                && { add "script_stop=$a"; break; }
-        done
+        for a in stop down; do has_arm "$first" "$a" && { add "script_stop=$a"; break; }; done
     fi
+    # A vite dev server's fixed port (server.port), e.g. paired with strictPort.
+    for d in $jsdirs; do
+        ports="$ports
+$(sed -n 's/^[[:space:]]*port:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$root/$d"/vite.config.* 2>/dev/null)"
+    done
+    for p in $(printf '%s\n' "$ports" | awk 'NF && !s[$0]++'); do add "port=$p"; done
 
     [ -f "$root/go.mod" ] && { add "go=yes"; found=1; }
     [ -f "$root/Cargo.toml" ] && { add "cargo=yes"; found=1; }
@@ -310,6 +325,24 @@ EOF
     want "pip sub-app with requirements" "$p" 'subapp=api|pip|ruff,req:requirements.txt|'
     : > "$p/pyproject.toml"
     deny "root Python owns the env -> no sub-apps" "$p" '^subapp='
+
+    # quantfolio shape: root uv Python, nested JS app, two-server run script,
+    # tools/dev.sh with test)/fmt| case arms.
+    q=$tmp/qf; mkdir -p "$q/src/frontend" "$q/scripts" "$q/tools"
+    : > "$q/pyproject.toml"; : > "$q/uv.lock"; printf 'pytest\nruff\n' > "$q/requirements.txt"
+    printf '/build\n' > "$q/.gitignore"; printf 'node_modules\ndist\n' > "$q/src/frontend/.gitignore"
+    echo '{"scripts":{"dev":"vite","build":"vite build","test":"vitest run","lint":"eslint ."}}' > "$q/src/frontend/package.json"
+    : > "$q/src/frontend/package-lock.json"
+    printf 'export default {\n  server: {\n    port: 9173,\n    strictPort: true,\n  },\n}\n' > "$q/src/frontend/vite.config.ts"
+    printf '#!/usr/bin/env bash\nAPI_PORT=9100\nFRONT_PORT=9173   # vite strictPort\nnpm run dev\n' > "$q/scripts/dev.sh"
+    printf '#!/usr/bin/env bash\ncase "$1" in\n  up) : ;;\n  test) : ;;\n  fmt|format) : ;;\nesac\n' > "$q/tools/dev.sh"
+    want "nested JS app + every port + script subcommands" "$q" py=uv 'js=src/frontend|npm|dev,build,test,lint' \
+        port=9100 port=9173 'script=scripts/dev.sh|bash' 'script_sub=tools/dev.sh|bash|test' \
+        'script_sub=tools/dev.sh|bash|fmt' artifact=src/frontend/dist artifact=build
+    [ "$(detect "$q" | grep -c '^port=')" = 2 ] && printf 'ok    ports deduplicated\n' \
+        || { printf 'FAIL  ports not deduplicated\n'; fail=1; }
+    deny "tools/dev.sh is not a run script; no lint) arm -> no lint sub" "$q" '^script=tools/|^script_sub=.*\|lint$'
+    deny "root /build is anchored: never src/frontend/build" "$q" '^artifact=src/frontend/build$'
 
     g=$tmp/go; mkdir -p "$g"; : > "$g/go.mod"; : > "$g/Cargo.toml"; : > "$g/compose.yml"
     want "go / cargo / compose" "$g" go=yes cargo=yes compose=compose.yml
