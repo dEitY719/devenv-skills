@@ -1,7 +1,8 @@
 # devenv-skills
 
-Three skills for the one-time work of setting a machine and its toolchain up —
-migrate a legacy Python venv project onto mise + uv, move a config file into
+Four skills for the one-time work of setting a machine and its toolchain up —
+migrate a legacy Python venv project onto mise + uv, generate a stack-aware
+Makefile, move a config file into
 dotfiles and link it back, replace ad-hoc `ssh-copy-id` with an audited key
 manifest. Packaged as a single plugin named `devenv`, installable on six
 coding-agent harnesses.
@@ -11,10 +12,11 @@ coding-agent harnesses.
 | Skill | Invoke | What it does |
 |-------|--------|--------------|
 | `mise-migrate` | `/devenv:mise-migrate [path] [--apply]` | Converts a pyenv / `python -m venv` + pip + setuptools project into `mise.toml` (tools, env, tasks) with uv owning the venv and dependencies. Python-venv projects only; dry-run unless `--apply`. |
+| `makefile-gen` | `/devenv:makefile-gen [path] [--apply] [--force]` | Detects the project's stack and generates a `Makefile`: `help` (default, built from `##` comments), `build`, `run`, `clear` always; `setup`, `serve`, `stop`, `status`, `logs`, `test*`, `lint`, `fmt`, `gen-*` only when detected. Recipes delegate to mise tasks, `package.json` scripts or run scripts. Dry-run unless `--apply`. |
 | `symlink-manager` | `/devenv:symlink-manager <file>` | Moves a config file into the dotfiles repo, links it back from its original path with a `.backup` of the original, generates `<app>_init` / `<app>_edit_*` helpers, updates help, and commits. |
 | `ssh-delegate` | `/devenv:ssh-delegate <sync\|add\|list\|test\|revoke\|doctor>` | Manages SSH key delegation through `~/.ssh/delegations.yml` (mode 0600) instead of one-shot `ssh-copy-id` — identity pinning, host-fingerprint pinning, and a `flock`-serialized JSONL audit log. |
 
-All three write. None of them is a read-only auditor — see
+All four write. None of them is a read-only auditor — see
 [Harness support](#harness-support) and [`CLAUDE.md`](CLAUDE.md) for each
 skill's safety contract.
 
@@ -69,8 +71,8 @@ Antigravity (`agy`) shares `~/.gemini`, so it inherits the install.
 ## Harness support
 
 These skills are written in Claude Code's vocabulary, but none of them depends
-on a Claude-Code-only tool: `mise-migrate` and `symlink-manager` need only
-read/write/shell, and `ssh-delegate` is a thin router over a POSIX-sh script in
+on a Claude-Code-only tool: `mise-migrate`, `makefile-gen` and
+`symlink-manager` need only read/write/shell, and `ssh-delegate` is a thin router over a POSIX-sh script in
 `skills/ssh-delegate/lib/`. What varies between harnesses is not the tool
 vocabulary but the *environment* each one runs in. Per-harness tool names are
 mapped in [`harness-skills/references/`](https://github.com/dEitY719/harness-skills/tree/main/references);
@@ -79,6 +81,7 @@ read the one file for the harness you are on.
 | Skill | Claude Code | Codex | Kimi | Gemini / Antigravity | Hermes | OpenCode |
 |-------|:-----------:|:-----:|:----:|:--------------------:|:------:|:--------:|
 | `mise-migrate` | full | full | full | full | full | full |
+| `makefile-gen` | full | full | full | full | full | full |
 | `symlink-manager` | full | full | full | full | full | full |
 | `ssh-delegate` | full | needs a TTY for `add` | needs a TTY for `add` | needs a TTY for `add` | needs a TTY for `add` | needs a TTY for `add` |
 
@@ -88,9 +91,10 @@ detects this and fails fast with the exact command to run in a real terminal;
 every other sub-command (`sync`, `list`, `test`, `revoke`, `doctor`) works
 unattended. This applies to Claude Code's non-interactive `!` sessions too.
 
-Two environment dependencies apply everywhere: `mise-migrate --apply` runs
+Three environment dependencies apply everywhere: `mise-migrate --apply` runs
 `uv sync`, so `uv` must be on `PATH`; `symlink-manager` assumes a dotfiles repo
-laid out as `bash/{claude,app,config,env}/` and commits with `git`.
+laid out as `bash/{claude,app,config,env}/` and commits with `git`; `makefile-gen`'s
+generated `stop`/`status` targets use `fuser` (Linux psmisc).
 
 ## Layout
 
@@ -98,10 +102,10 @@ Manifests live at the repo root and all point at one flat `skills/` directory:
 
 ```
 .
-├── skills/{mise-migrate,symlink-manager,ssh-delegate}/
+├── skills/{mise-migrate,makefile-gen,symlink-manager,ssh-delegate}/
 │   ├── SKILL.md
 │   ├── references/
-│   └── lib/                                   ssh-delegate only
+│   └── lib/                                   helper scripts (POSIX sh)
 ├── .claude-plugin/{marketplace,plugin}.json   Claude Code
 ├── .codex-plugin/plugin.json                  Codex
 ├── .kimi-plugin/plugin.json                   Kimi CLI
@@ -150,7 +154,7 @@ To change what is checked, edit that workflow, not this repo.
 
 ## Provenance
 
-These skills were extracted from
+`mise-migrate`, `symlink-manager` and `ssh-delegate` were extracted from
 [`dEitY719/dotfiles`](https://github.com/dEitY719/dotfiles)
 (`claude/skills/devx-{mise-migrate,symlink-manager,ssh-delegate}`, since removed
 in that repo's Phase 4-1) as a content snapshot — no history rewriting. The

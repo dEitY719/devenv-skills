@@ -16,7 +16,7 @@ project-level):
 ```
 
 Restart OpenCode. The plugin installs through OpenCode's plugin manager and
-registers all three skills.
+registers all four skills.
 
 OpenCode uses its own plugin install. If you also use Claude Code, Codex, or
 another harness, install this plugin separately for each one.
@@ -47,10 +47,13 @@ do not recognise. Short version:
   `"explore"` for read-only repo exploration)
 - "Invoke a skill" -> OpenCode's native `skill` tool
 
-All three devenv skills write, so their safety contracts matter here:
+All four devenv skills write, so their safety contracts matter here:
 
 - `mise-migrate` is dry-run by default. Without an explicit `--apply` it prints
   the plan and must not reach `apply_patch` or a mutating `bash`.
+- `makefile-gen` is dry-run by default too. `--apply` writes only `Makefile`,
+  refuses an existing one without `--force` (which keeps `Makefile.bak`), and
+  verifies with `make -n` — it never runs `run`, `stop` or `build` for real.
 - `symlink-manager` moves a config file out of its original location and
   commits. It backs the original up to `.backup` first, verifies the link, and
   rolls back from that backup if the move fails.
