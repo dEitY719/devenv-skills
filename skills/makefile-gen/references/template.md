@@ -53,7 +53,8 @@ value.
   serve`, `test-all: test test-e2e`); `make -n` executes `$(MAKE)` lines,
   which would break the no-side-effect verification.
 - **Aliases are dependencies**: `clean: clear ## Same as clear`.
-- **`stop` is port-based** (`fuser $(PORT)/tcp`); `pkill` / `killall` are
+- **`stop` is port-based** (`fuser $(PORT)/tcp`) or the run script's own
+  teardown (`<bash|sh> ./<script> stop|down`); `pkill` / `killall` are
   rejected anywhere in the file.
 - **`clear` never names `.env*`, `node_modules`, `.venv`, `.git` or a
   `data` dir** outside a `-prune` clause.

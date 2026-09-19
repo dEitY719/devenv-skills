@@ -15,8 +15,13 @@
 #   mise_task=<name>                (repeat) [tasks.<name>] in mise.toml
 #   js=<dir>|<runner>|<s1,s2,...>   (repeat) package.json dir, runner, scripts
 #   py=<uv|pip>  py_version=<v>  py_reqs=<file>  py_test=pytest  py_lint=ruff
+#   subapp=<dir>|<uv|pip|->|<pytest,ruff,req:F>|<mise tasks>  (repeat)
+#                                   Python and/or mise.toml in an immediate
+#                                   subdir (only when the root has no Python)
 #   script=<rel>|<bash|sh>          (repeat) run-*.sh, scripts/{dev,start,run}.sh
 #   port=<n>  port_var=<NAME>  log=<path>        from the first server script
+#   script_stop=<stop|down>         first script has that case arm (teardown)
+#   devserver=<signal>              first script starts a dev server (vite, ...)
 #   go=yes  cargo=yes  compose=<file>
 #   artifact=<rel>                  (repeat) allowlist entry that is gitignored
 #   warn=<text>                     (repeat) e.g. lockfile conflict
@@ -30,7 +35,7 @@ set -u
 ALLOW='dist build out coverage .pytest_cache __pycache__ test-results playwright-report target .next .turbo'
 
 usage() {
-    sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 # ignored <root> <rel>: is <rel> matched by <root>/.gitignore or by the
@@ -61,6 +66,23 @@ py_mentions() {
 # pkg_scripts <package.json>: comma list of the "scripts" object's keys.
 # jq when present; the awk fallback assumes the usual one-key-per-line layout
 # and can truncate at a `}` inside a script string (e.g. `${VAR}`).
+# mise_tasks <dir>: [tasks.X] names from its mise.toml / .mise.toml, one per line.
+mise_tasks() {
+    for _m in "$1/mise.toml" "$1/.mise.toml"; do
+        [ -f "$_m" ] && sed -n 's/^\[tasks\.\"\{0,1\}\([A-Za-z0-9_:-]*\)\"\{0,1\}\][[:space:]]*$/\1/p' "$_m"
+    done
+}
+has_pytest() { [ -f "$1/pytest.ini" ] || [ -f "$1/conftest.py" ] || py_mentions "$1" 'pytest'; }
+has_ruff() { [ -f "$1/ruff.toml" ] || [ -f "$1/.ruff.toml" ] || py_mentions "$1" '(^|[^a-z])ruff'; }
+py_kind() { # <dir>: uv | pip | "" -- uv.lock alone is enough for uv
+    _k=""
+    [ -f "$1/pyproject.toml" ] || [ -f "$1/setup.py" ] && _k=pip
+    for _f in "$1"/requirements*.txt; do [ -f "$_f" ] && _k=pip; done
+    [ -f "$1/uv.lock" ] && _k=uv
+    printf '%s' "$_k"
+}
+py_reqs() { for _f in requirements-dev.txt requirements.txt; do [ -f "$1/$_f" ] && { printf '%s' "$_f"; return; }; done; }
+
 pkg_scripts() {
     if command -v jq >/dev/null 2>&1; then
         jq -r '(.scripts // {}) | keys_unsorted | join(",")' "$1" 2>/dev/null && return
@@ -103,12 +125,7 @@ detect() {
         break
     done
 
-    for m in "$root/mise.toml" "$root/.mise.toml"; do
-        [ -f "$m" ] || continue
-        for t in $(sed -n 's/^\[tasks\.\"\{0,1\}\([A-Za-z0-9_:-]*\)\"\{0,1\}\][[:space:]]*$/\1/p' "$m"); do
-            add "mise_task=$t"; found=1
-        done
-    done
+    for t in $(mise_tasks "$root"); do add "mise_task=$t"; found=1; done
 
     # A root package.json owns the workspace; sub-apps count only without one.
     if [ -f "$root/package.json" ]; then jsdirs=.
@@ -120,24 +137,33 @@ detect() {
         add "js=$d|$RUNNER|$(pkg_scripts "$root/$d/package.json")"; found=1
     done
 
-    py=""; pyt=""
+    py=""; pyt=""; subdirs=""
+    # uv.lock alone at the root is not Python (pre-existing rule): needs a manifest.
     [ -f "$root/pyproject.toml" ] || [ -f "$root/setup.py" ] && py=pip
     for f in "$root"/requirements*.txt; do [ -f "$f" ] && py=pip; done
     [ -n "$py" ] && [ -f "$root/uv.lock" ] && py=uv
     if [ -n "$py" ]; then
         found=1; add "py=$py"
         [ -f "$root/.python-version" ] && add "py_version=$(head -n1 "$root/.python-version")"
-        for f in requirements-dev.txt requirements.txt; do
-            [ -f "$root/$f" ] && { add "py_reqs=$f"; break; }
+        rq=$(py_reqs "$root"); [ -n "$rq" ] && add "py_reqs=$rq"
+        has_pytest "$root" && { add "py_test=pytest"; pyt=" . "; }
+        has_ruff "$root" && add "py_lint=ruff"
+    else
+        # Sub-apps: an immediate subdir with Python and/or mise tasks, the way
+        # frontend/ is a JS sub-app. A root Python project owns the env instead.
+        for d in "$root"/*/; do
+            d=${d%/}; n=${d##*/}
+            case " $jsdirs " in *" $n "*) continue ;; esac
+            sp=$(py_kind "$d"); mt=$(mise_tasks "$d" | paste -sd, -)
+            [ -n "$sp$mt" ] || continue
+            fl=""
+            if [ -n "$sp" ]; then
+                has_pytest "$d" && { fl=pytest; pyt="$pyt $n "; }
+                has_ruff "$d" && fl="${fl:+$fl,}ruff"
+                rq=$(py_reqs "$d"); [ -n "$rq" ] && fl="${fl:+$fl,}req:$rq"
+            fi
+            add "subapp=$n|${sp:--}|$fl|$mt"; found=1; subdirs="$subdirs $n"
         done
-        if [ -f "$root/pytest.ini" ] || [ -f "$root/conftest.py" ] \
-            || py_mentions "$root" 'pytest'; then
-            add "py_test=pytest"; pyt=1
-        fi
-        if [ -f "$root/ruff.toml" ] || [ -f "$root/.ruff.toml" ] \
-            || py_mentions "$root" '(^|[^a-z])ruff'; then
-            add "py_lint=ruff"
-        fi
     fi
 
     first=""
@@ -159,6 +185,15 @@ detect() {
         lg=$(sed -n 's/.*LOG:-\([^"'"'"' ]*\.log\).*/\1/p' "$first" | head -n1)
         [ -n "$lg" ] || lg=$(sed -n 's/.*>[[:space:]]*\(\/[^"'"'"' ]*\.log\).*/\1/p' "$first" | head -n1)
         [ -n "$lg" ] && add "log=$lg"
+        # A dev server builds/serves for itself, so run must not depend on build.
+        # ponytail: word-match heuristic (comments count); extend the list as needed.
+        dv=$(grep -owE -e 'vite' -e 'run dev' -e 'next dev' -e 'webpack serve' -e '--reload' "$first" | head -n1)
+        [ -n "$dv" ] && add "devserver=$dv"
+        # Its own teardown subcommand: a `stop)` / `down)` case arm (stop first).
+        for a in stop down; do
+            grep -qE "^[[:space:]]*\(?([^)]*\|)?[\"']?${a}[\"']?(\|[^)]*)?\)" "$first" \
+                && { add "script_stop=$a"; break; }
+        done
     fi
 
     [ -f "$root/go.mod" ] && { add "go=yes"; found=1; }
@@ -167,16 +202,17 @@ detect() {
         [ -f "$root/$c" ] && { add "compose=$c"; found=1; break; }
     done
 
-    # clear targets: allowlist names at the root and in each JS app dir,
+    # clear targets: allowlist names at the root and in each app dir,
     # kept only if a .gitignore covers them. pytest self-ignores its cache.
-    for d in . $jsdirs; do
+    for d in . $jsdirs $subdirs; do
         for a in $ALLOW; do
             rel=$a; [ "$d" = . ] || rel="$d/$a"
             case "$a" in __pycache__) [ "$d" = . ] || continue ;; esac
-            if ignored "$root" "$rel"; then add "artifact=$rel"
-            elif [ "$rel" = .pytest_cache ] && [ -n "$pyt" ]; then
-                add "artifact=$rel"
-            fi
+            if ignored "$root" "$rel"; then :
+            elif [ "$a" = .pytest_cache ]; then
+                case "$pyt" in *" $d "*) ;; *) continue ;; esac
+            else continue; fi
+            add "artifact=$rel"
         done
     done
 
@@ -253,6 +289,27 @@ EOF
     echo '{"scripts":{"build":"a"}}' > "$a/apps/x/package.json"; echo '{"scripts":{"build":"b"}}' > "$a/apps/y/package.json"
     : > "$a/apps/y/pnpm-lock.yaml"
     want "apps/* sub-apps" "$a" 'js=apps/x|npm|build' 'js=apps/y|pnpm|build'
+
+    # stock-steward shape: JS frontend + uv/mise backend sub-app, dev script
+    # with a `down)` arm that never names dist.
+    k=$tmp/ss; mkdir -p "$k/frontend" "$k/backend" "$k/scripts" "$k/docs"
+    printf '.pytest_cache/\nfrontend/dist/\n' > "$k/.gitignore"
+    echo '{"scripts":{"dev":"vite","build":"vite build"}}' > "$k/frontend/package.json"
+    printf '[project]\ndependencies = ["ruff>=0.6", "pytest"]\n' > "$k/backend/pyproject.toml"; : > "$k/backend/uv.lock"
+    printf '[tasks.install]\nrun = "uv sync"\n[tasks.test]\nrun = "x"\n' > "$k/backend/mise.toml"
+    printf '#!/usr/bin/env bash\ncase "$1" in\n  down) DOWN=1 ;;\nesac\nnpm run dev\n' > "$k/scripts/dev.sh"
+    want "python/mise sub-app + script down arm" "$k" 'subapp=backend|uv|pytest,ruff|install,test' \
+        script_stop=down artifact=frontend/dist artifact=backend/.pytest_cache
+    want "dev-server script -> devserver" "$k" 'devserver=run dev'
+    printf '#!/bin/sh\ncase "$1" in\n  start|stop) : ;;\n  down) : ;;\nesac\nexec python -m web\n' > "$k/scripts/dev.sh"
+    want "stop arm preferred over down" "$k" script_stop=stop 'script=scripts/dev.sh|sh'
+    deny "plain server script -> no devserver" "$k" '^devserver='
+    printf 'uvicorn app:app --reload\n' > "$k/scripts/dev.sh"
+    want "--reload is a dev-server signal" "$k" 'devserver=--reload'
+    p=$tmp/pipsub; mkdir -p "$p/api"; printf 'ruff\n' > "$p/api/requirements.txt"
+    want "pip sub-app with requirements" "$p" 'subapp=api|pip|ruff,req:requirements.txt|'
+    : > "$p/pyproject.toml"
+    deny "root Python owns the env -> no sub-apps" "$p" '^subapp='
 
     g=$tmp/go; mkdir -p "$g"; : > "$g/go.mod"; : > "$g/Cargo.toml"; : > "$g/compose.yml"
     want "go / cargo / compose" "$g" go=yes cargo=yes compose=compose.yml

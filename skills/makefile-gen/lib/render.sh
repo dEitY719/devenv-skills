@@ -23,7 +23,7 @@ usage() { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; }
 
 # ---------------------------------------------------------------- facts ------
 load() { # <detect output> -> globals
-    MISE=""; JS=""; SCRIPTS=""; ARTS=""
+    MISE=""; JS=""; SUBS=""; SCRIPTS=""; ARTS=""; DEVSERVER=""; SSTOP=""
     PY=""; PYV=""; PYREQS=""; PYTEST=""; PYLINT=""; PORT=""; PORTVAR=""; LOG=""
     GO=""; CARGO=""; COMPOSE=""; DLANG=en; ST=""; WARNS=""
     _o=$IFS; IFS=$NL
@@ -33,6 +33,8 @@ load() { # <detect output> -> globals
             status) ST=$_v ;; lang) DLANG=$_v ;;
             mise_task) MISE="$MISE $_v" ;;
             js) JS="$JS$_v$NL" ;;
+            subapp) SUBS="$SUBS$_v$NL" ;;
+            devserver) DEVSERVER=$_v ;; script_stop) SSTOP=$_v ;;
             script) SCRIPTS="$SCRIPTS$_v$NL" ;;
             artifact) ARTS="$ARTS $_v" ;;
             py) PY=$_v ;; py_version) PYV=$_v ;; py_reqs) PYREQS=$_v ;;
@@ -61,6 +63,32 @@ js_cmd() { # <hit line> -> shell command
     [ "$_d" = . ] && printf '%s run %s' "$_r" "$_s" || printf 'cd %s && %s run %s' "$_d" "$_r" "$_s"
 }
 js_src() { printf '%s/package.json scripts.%s' "${1%%"$TAB"*}" "${1##*"$TAB"}"; }
+
+# sub_hits <target>: "cmd<TAB>source" per Python/mise sub-app, mise task first,
+# then the tool directly (uv, or the sub-app's own .venv for pip).
+sub_hits() {
+    case "$1" in setup) _ns="install setup" ;; fmt) _ns="fmt format" ;; *) _ns=$1 ;; esac
+    printf '%s' "$SUBS" | while IFS='|' read -r _d _p _f _m; do
+        [ -n "$_d" ] || continue
+        _c=""; _src=""
+        for _n in $_ns; do
+            case ",$_m," in *",$_n,"*) _c="mise run $_n"; _src="$_d/mise.toml [tasks.$_n]"; break ;; esac
+        done
+        [ "$_p" = uv ] && _x='uv run ' || _x='.venv/bin/python -m '
+        if [ -z "$_c" ]; then case "$1:$_p:,$_f," in
+            setup:uv:*) _c="uv sync"; _src="$_d/uv.lock" ;;
+            setup:pip:*,req:*) _q=${_f#*req:}; _q=${_q%%,*}
+                _c="{ test -x .venv/bin/python || python3 -m venv .venv; } && .venv/bin/pip install -q -r $_q"; _src="$_d/$_q" ;;
+            setup:pip:*) _c="{ test -x .venv/bin/python || python3 -m venv .venv; } && .venv/bin/pip install -q -e ."; _src="$_d/pyproject.toml" ;;
+            test:[up]*:*,pytest,*) _c="${_x}pytest"; _src="$_d pytest" ;;
+            lint:[up]*:*,ruff,*) _c="${_x}ruff check ."; _src="$_d ruff" ;;
+            fmt:[up]*:*,ruff,*) _c="${_x}ruff format ."; _src="$_d ruff" ;;
+        esac; fi
+        [ -n "$_c" ] && printf 'cd %s && %s\t%s\n' "$_d" "$_c" "$_src"
+    done
+}
+r_sub() { r "${1%%"$TAB"*}"; }
+sub_srcs() { printf '%s\n' "$1" | awk -F'\t' -v s="$2" 'NF {o = o (n++ ? s : "") $2} END {printf "%s", o}'; }
 
 # ---------------------------------------------------------------- emit -------
 target() { # <name> <deps> <desc> <source>
@@ -94,11 +122,12 @@ render() { # <path> -> sets BODY, NAMES, REPORT, VARS
     if mise_t setup; then
         target setup "" "$(L '최초 1회: 의존성 설치' 'First-time setup: install dependencies')" "mise.toml [tasks.setup]"
         r "mise run setup"
-    elif [ -n "$PY$JS" ]; then
+    elif _sh=$(sub_hits setup); [ -n "$PY$JS$_sh" ]; then
         _v=$(printf '%s' "$PYV" | cut -d. -f1,2)
         _pd=""; _s=""
         [ -n "$PY" ] && { _pd=" .venv${_v:+ (Python $_v)} +"; _s="${PYREQS:-pyproject.toml}${_v:+ + .python-version}"; }
         [ -n "$JS" ] && _s="${_s:+$_s + }package.json"
+        [ -n "$_sh" ] && _s="${_s:+$_s + }$(sub_srcs "$_sh" ' + ')"
         target setup "" "$(L "최초 1회:$_pd 의존성 설치" "First-time setup:$_pd install dependencies")" "$_s"
         if [ "$PY" = uv ]; then r "uv sync"
         elif [ -n "$PY" ]; then
@@ -110,6 +139,7 @@ render() { # <path> -> sets BODY, NAMES, REPORT, VARS
         _inst() { _d=${1%%|*}; _r=${1#*|}; _r=${_r%%|*}
             [ "$_d" = . ] && r "$_r install" || r "cd $_d && $_r install"; }
         each "$JS" _inst
+        each "$_sh" r_sub
     else skip setup "no dependency manifest (pyproject/requirements/package.json/mise)"; fi
 
     # build
@@ -153,7 +183,7 @@ render() { # <path> -> sets BODY, NAMES, REPORT, VARS
         go) target run "" "$(L '실행' 'Run')" "go.mod"; r "go run ." ;;
         cargo) target run "" "$(L '실행' 'Run')" "Cargo.toml"; r "cargo run" ;;
         script)
-            if [ "$BUILD_REAL" = 1 ]; then
+            if [ "$BUILD_REAL" = 1 ] && [ -z "$DEVSERVER" ]; then
                 target run "build serve" "$(L '빌드 후 서버 (재)기동 -- 코드를 바꿨으면 이것' 'Build, then (re)start the server')" "build + serve"
                 target serve "" "$(L '빌드 없이 서버 (재)기동 -- 산출물이 없으면 멈춘다' '(Re)start the server without building; stops if the build output is missing')" "$_sp"
                 if [ -n "$GUARD" ]; then r "@test -e $GUARD || { echo \"$(L "$GUARD 없음 -- 먼저 make build" "$GUARD missing -- run make build first")\"; exit 1; }"
@@ -166,20 +196,24 @@ render() { # <path> -> sets BODY, NAMES, REPORT, VARS
             target run "" "$(L '실행 명령 없음(no-op) -- 직접 채운다' 'No run command detected (no-op) -- fill it in')" "none detected"
             r "@echo \"$(L '실행 명령 없음 -- Makefile 의 run 을 채운다' 'no run command detected -- edit the run target')\"" ;;
     esac
-    has_t serve || skip serve "run does not depend on build (or runs no server script)"
+    if has_t serve; then :
+    elif [ "$RKIND" = script ] && [ -n "$DEVSERVER" ]; then skip serve "run script starts a dev server ($DEVSERVER); it builds/serves for itself"
+    else skip serve "run does not depend on build (or runs no server script)"; fi
 
     # stop / status / logs -- only for a server whose port / log is known
     case "$RKIND" in script|js|mise) SERVER=1 ;; *) SERVER="" ;; esac
-    if [ -n "$PORT" ] && [ -n "$SERVER" ]; then
+    if [ "$RKIND" = script ] && [ -n "$SSTOP" ]; then
+        target stop "" "$(L '종료 -- 실행 스크립트의 정리 명령에 맡긴다' 'Stop via the run script teardown subcommand')" "$_sp $SSTOP"
+        r "${SCRIPT##*|} ./$_sp $SSTOP"
+    elif [ -n "$PORT" ] && [ -n "$SERVER" ]; then
         target stop "" "$(L '서버 종료(포트 기준 -- 같은 이름의 다른 프로세스는 건드리지 않는다)' 'Stop the server by port (never by process name)')" "port $PORT"
         r "@if fuser \$(PORT)/tcp >/dev/null 2>&1; then fuser -k -TERM \$(PORT)/tcp >/dev/null 2>&1; echo \"$(L '종료 요청' 'stop requested'): \$(PORT)\"; else echo \"$(L '떠 있는 서버 없음' 'nothing listening on'): \$(PORT)\"; fi"
+    else skip stop "no long-running server with a known port (pass --port N)"; fi
+    if [ -n "$PORT" ] && [ -n "$SERVER" ]; then
         target status "" "$(L '서버·빌드 상태' 'Server and build status')" "port $PORT${GUARD:+ + $GUARD}"
         r "@if fuser \$(PORT)/tcp >/dev/null 2>&1; then echo \"$(L '실행 중' 'running'): \$(PORT)\"; else echo \"$(L '정지' 'stopped'): \$(PORT)\"; fi"
         [ -n "$GUARD" ] && r "@test -e $GUARD && echo \"$(L "$GUARD 있음" "$GUARD present")\" || echo \"$(L "$GUARD 없음 -- make build" "$GUARD missing -- make build")\""
-    else
-        skip stop "no long-running server with a known port (pass --port N)"
-        skip status "no long-running server with a known port (pass --port N)"
-    fi
+    else skip status "no long-running server with a known port (pass --port N)"; fi
     if [ -n "$LOG" ]; then
         target logs "" "$(L '서버 로그 따라 보기(Ctrl+C 로 종료)' 'Follow the server log (Ctrl+C to quit)')" "${_sp:-script} log redirect"
         r 'tail -f $(LOG)'
@@ -188,14 +222,15 @@ render() { # <path> -> sets BODY, NAMES, REPORT, VARS
     # test
     if mise_t test; then target test "" "$(L '단위 테스트' 'Unit tests')" "mise.toml [tasks.test]"; r "mise run test"
     else
-        _h=$(js_hits test); _s=""
+        _h=$(js_hits test); _sh=$(sub_hits test); _s=""
         [ -n "$PYTEST" ] && _s="pytest"
         [ -n "$_h" ] && _s="${_s:+$_s, }$(srcs "$_h")"
+        [ -n "$_sh" ] && _s="${_s:+$_s, }$(sub_srcs "$_sh" ', ')"
         [ -n "$GO" ] && _s="${_s:+$_s, }go.mod"; [ -n "$CARGO" ] && _s="${_s:+$_s, }Cargo.toml"
         if [ -n "$_s" ]; then
             target test "" "$(L '단위 테스트' 'Unit tests')" "$_s"
             [ -n "$PYTEST" ] && r "$(pyrun pytest)"
-            each "$_h" r_js
+            each "$_h" r_js; each "$_sh" r_sub
             [ -n "$GO" ] && r "go test ./..."; [ -n "$CARGO" ] && r "cargo test"
         else skip test "no test runner detected"; fi
     fi
@@ -213,10 +248,13 @@ render() { # <path> -> sets BODY, NAMES, REPORT, VARS
         [ "$_t" = lint ] && _d=$(L '린트' 'Lint') || _d=$(L '포맷' 'Format')
         if mise_t "$_t"; then target "$_t" "" "$_d" "mise.toml [tasks.$_t]"; r "mise run $_t"; continue; fi
         [ "$_t" = lint ] && _h=$(js_hits lint) || _h=$(js_hits format fmt)
+        _sh=$(sub_hits "$_t")
         _s=$(srcs "$_h"); [ -n "$PYLINT" ] && _s="${_s:+$_s, }ruff"
+        [ -n "$_sh" ] && _s="${_s:+$_s, }$(sub_srcs "$_sh" ', ')"
         if [ -n "$_s" ]; then
             target "$_t" "" "$_d" "$_s"; each "$_h" r_js
             [ -n "$PYLINT" ] && { [ "$_t" = lint ] && r "$(pyrun 'ruff check .')" || r "$(pyrun 'ruff format .')"; }
+            each "$_sh" r_sub
         else skip "$_t" "no $_t tool detected"; fi
     done
 
@@ -280,7 +318,8 @@ check() {
     grep -qE '^\.ONESHELL|\$\(file ' "$f" && no "GNU Make 4.x-only construct (.ONESHELL / \$(file))"
     grep -qE '^[a-zA-Z0-9_-]+:.*## .*\$\(' "$f" && no "\$(VAR) inside a ## description (awk prints it raw)"
     grep -qE 'pkill|killall' "$f" && no "name-based kill (pkill/killall); stop must be port-based"
-    if grep -q '^stop:' "$f"; then recipe stop "$f" | grep -qF 'fuser $(PORT)/tcp' || no "stop is not fuser \$(PORT)/tcp"; fi
+    if grep -q '^stop:' "$f"; then recipe stop "$f" | grep -qE -e 'fuser \$\(PORT\)/tcp' -e '^	(bash|sh) \./[^ ]+ (stop|down)$' \
+        || no "stop is neither fuser \$(PORT)/tcp nor the run script's stop/down"; fi
     recipe clear "$f" | sed -e "s/-name [^ ]* -prune//g" -e "s/-path [^ ]* -prune//g" \
         | grep -qE '\.env|node_modules|\.venv|\.git|(^|[/[:space:]])data(/|[[:space:]]|$)' \
         && no "clear touches .env*/node_modules/.venv/.git/data"
@@ -348,8 +387,34 @@ self_test() {
     [ "$(targets "$b")" = "help setup build run serve stop status logs test test-e2e test-all gen-api clear clean" ] \
         && ok "brokerdesk target set = PR #76" || ko "brokerdesk targets: $(targets "$b")"
     grep -q '^serve: ## ' "$b/Makefile" && grep -q '^run: build serve ## ' "$b/Makefile" \
+        && recipe serve "$b/Makefile" | grep -qF '@test -e frontend/dist ||' \
         && grep -qF 'WEB_PORT=$(PORT) bash ./run-web.sh' "$b/Makefile" && grep -qF 'LOG  := /tmp/web-$(PORT).log' "$b/Makefile" \
-        && ok "run -> build serve, serve delegates to run-web.sh" || ko "brokerdesk run/serve/log mapping"
+        && recipe stop "$b/Makefile" | grep -qF 'fuser $(PORT)/tcp' \
+        && ok "plain script -> run: build serve + guard, stop by port" || ko "brokerdesk run/serve/log mapping"
+
+    # stock-steward shape: JS frontend + uv/mise backend, dev script with down)
+    k=$tmp/ss; mkdir -p "$k/frontend" "$k/backend" "$k/scripts"
+    printf 'frontend/dist/\n.pytest_cache/\n' > "$k/.gitignore"
+    echo '{"scripts":{"dev":"vite","build":"b","test":"t","lint":"l","fmt":"f"}}' > "$k/frontend/package.json"
+    printf '[project]\ndependencies = ["ruff", "pytest"]\n' > "$k/backend/pyproject.toml"; : > "$k/backend/uv.lock"
+    printf '[tasks.install]\nrun="uv sync"\n[tasks.test]\nrun="x"\n[tasks.lint]\nrun="x"\n' > "$k/backend/mise.toml"
+    printf '#!/usr/bin/env bash\ncase "$1" in\n  down) exit 0 ;;\nesac\nnpm run dev\n' > "$k/scripts/dev.sh"
+    gen "$k" && ok "stock-steward shape passes --check" || ko "stock-steward --check"
+    [ "$(recipe setup "$k/Makefile")" = "${TAB}cd frontend && npm install${NL}${TAB}cd backend && mise run install" ] \
+        && [ "$(recipe test "$k/Makefile")" = "${TAB}cd frontend && npm run test${NL}${TAB}cd backend && mise run test" ] \
+        && [ "$(recipe lint "$k/Makefile")" = "${TAB}cd frontend && npm run lint${NL}${TAB}cd backend && mise run lint" ] \
+        && [ "$(recipe fmt "$k/Makefile")" = "${TAB}cd frontend && npm run fmt${NL}${TAB}cd backend && uv run ruff format ." ] \
+        && ok "sub-app: mise task > uv tool, aggregated with JS" || ko "sub-app mapping: $(cat "$k/Makefile")"
+    grep -q '^run: ## ' "$k/Makefile" && ! grep -q '^serve:' "$k/Makefile" \
+        && recipe run "$k/Makefile" | grep -qx "${TAB}bash ./scripts/dev.sh" \
+        && recipe stop "$k/Makefile" | grep -qx "${TAB}bash ./scripts/dev.sh down" \
+        && main "$k" --report | grep -qxF "target=stop${TAB}source=scripts/dev.sh down" \
+        && main "$k" --report | grep -qF "skip=serve${TAB}reason=run script starts a dev server (run dev)" \
+        && recipe clear "$k/Makefile" | grep -qF 'backend/.pytest_cache' \
+        && ok "dev-server script: run direct, stop -> script down" || ko "dev-script run/stop: $(cat "$k/Makefile")"
+    rm "$k/backend/mise.toml"; gen "$k" && recipe setup "$k/Makefile" | grep -qx "${TAB}cd backend && uv sync" \
+        && recipe test "$k/Makefile" | grep -qx "${TAB}cd backend && uv run pytest" \
+        && ok "sub-app without mise -> uv sync / uv run pytest" || ko "sub-app uv fallback"
 
     # mise tasks delegate, never duplicate
     m=$tmp/mise; mkdir -p "$m"; printf '[tasks.build]\nrun="x"\n[tasks.test]\nrun="y"\n[tasks.fix]\nrun="z"\n' > "$m/mise.toml"
@@ -375,10 +440,11 @@ self_test() {
     bad ".ONESHELL" ".ONESHELL:${NL}$H${NL}clear: ## c${NL}${TAB}rm -rf dist"
     bad "help regex without digits" "$(printf '%s' "$H" | sed 's/a-zA-Z0-9_-/a-zA-Z_-/')${NL}clear: ## c${NL}${TAB}rm -rf dist"
     bad "\$(VAR) in description" "$H${NL}clear: ## port \$(PORT)${NL}${TAB}rm -rf dist"
+    bad "stop runs an arbitrary script arg" "$(printf '%s' "$H" | sed 's|fuser.*|bash ./dev.sh restart|')${NL}clear: ## c${NL}${TAB}rm -rf dist"
     bad "target missing from .PHONY" "$H${NL}clear: ## c${NL}${TAB}rm -rf dist${NL}lint: ## l${NL}${TAB}true"
 
     if [ "$hasmake" -eq 1 ]; then
-        for d in "$b" "$m" "$e" "$a"; do verify "$d" >/dev/null && ok "verify $(basename "$d")" || ko "verify $d: $(verify "$d")"; done
+        for d in "$b" "$m" "$e" "$a" "$k"; do verify "$d" >/dev/null && ok "verify $(basename "$d")" || ko "verify $d: $(verify "$d")"; done
         o=$(make --no-print-directory -C "$e" build 2>&1) && [ "$o" = "no build step" ] && ok "no-stack make build -> exit 0" || ko "no-stack build: $o"
     else printf 'skip  make not on PATH -- verify cases not run\n'; fi
 
