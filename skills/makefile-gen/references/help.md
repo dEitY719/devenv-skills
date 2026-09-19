@@ -60,7 +60,8 @@ compose), `build-<app>` (several sub-apps), and one target per remaining
   recipes call them.
 - Let `clear` touch `.env*`, credentials, `node_modules`, `.venv`, `.git`
   or runtime data directories.
-- Stop a server by process name (`pkill`) — `stop` is port-based.
+- Stop a server by process name (`pkill`) — `stop` is the run script's own
+  `stop`/`down` subcommand, else port-based.
 - Run `run`, `serve`, `stop` or `build` during verification — only `make`
   (help) and `make -n`.
 - Generate CI workflows, Dockerfiles, or a new build system.

@@ -86,7 +86,8 @@ at this repo's root, and adding one for tool mappings is a bug.
     alone refuses, `--apply --force` keeps `Makefile.bak` first. `clear` may
     delete only allowlisted, gitignored build/test artifacts (never `.env*`,
     `node_modules`, `.venv`, `.git` or data dirs), `stop` is port-based
-    (`fuser`), never `pkill`, and verification is `make` + `make -n` only.
+    (`fuser`) or the run script's own `stop`/`down` subcommand, never
+    `pkill`, and verification is `make` + `make -n` only.
     `lib/render.sh --check` enforces the generated-file rules.
   - `symlink-manager` — moves the original file out of its location, so it
     backs it up to `.backup` first and verifies the link; a Phase 1 failure
