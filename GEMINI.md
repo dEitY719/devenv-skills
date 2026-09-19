@@ -1,12 +1,13 @@
 # devenv — skill index
 
-Three skills for one-time machine and toolchain setup. Each lives in this
+Four skills for one-time machine and toolchain setup. Each lives in this
 extension's `skills/` directory. They are task-triggered: load the one that
-matches the job by reading its `SKILL.md`, then follow it. Do not load all three.
+matches the job by reading its `SKILL.md`, then follow it. Do not load all four.
 
 | Skill | Read | Use when |
 |-------|------|----------|
 | `mise-migrate` | `@./skills/mise-migrate/SKILL.md` | Converting a legacy Python venv / pip / setuptools project into the canonical `mise.toml` + uv layout. Python-venv projects only; refuses anything else. |
+| `makefile-gen` | `@./skills/makefile-gen/SKILL.md` | Generating a stack-aware `Makefile` (`help`/`build`/`run`/`clear` + detected extras) that delegates to existing mise tasks, `package.json` scripts or run scripts. |
 | `symlink-manager` | `@./skills/symlink-manager/SKILL.md` | Moving a config file into the dotfiles repo and linking it back from its original path, with management functions and a commit. |
 | `ssh-delegate` | `@./skills/ssh-delegate/SKILL.md` | Standardising SSH key delegation through `~/.ssh/delegations.yml` instead of ad-hoc `ssh-copy-id` — add, list, test, sync, revoke, doctor. |
 
@@ -54,11 +55,15 @@ instead — `agy` shares `~/.gemini` but not Gemini CLI's tool names.
 
 - `mise-migrate` is dry-run by default. It prints the plan and writes nothing
   unless the user passed `--apply`. Never infer `--apply` from context.
+- `makefile-gen` is dry-run by default as well. `--apply` writes only
+  `Makefile`, refuses an existing one unless `--force` is given (then it keeps
+  `Makefile.bak`), and verifies with `make -n` only — it never runs `run`,
+  `stop` or `build` for real.
 - `symlink-manager` moves the original file, so it must back it up to
   `.backup`, create the link, and verify it. Any phase failure aborts the run
   and reports `[FAIL]`; a Phase 1 failure restores from the backup. Announce the
   plan before the first change.
-- `ssh-delegate` is the most destructive of the three: it installs and removes
+- `ssh-delegate` is the most destructive of the four: it installs and removes
   public keys on remote hosts. Three rules are absolute — the manifest and ssh
   config drop-in are written mode 0600, a host-fingerprint MISMATCH reported by
   `sync` is an ALERT that stops the run (re-trusting a changed host key is a

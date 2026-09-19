@@ -7,20 +7,22 @@ text. Edit `CLAUDE.md`; never replace the symlink with a second copy.
 ## What this repo is
 
 A single-plugin skill marketplace. The plugin is named `devenv` and it bundles
-three skills for one-time machine and toolchain setup — the things you do once
+four skills for one-time machine and toolchain setup — the things you do once
 on a new box and then want reproducible:
 
 | Skill | Role |
 |-------|------|
 | `mise-migrate` | Convert a legacy Python venv/pip project into the canonical `mise.toml` + uv structure. Dry-run unless `--apply`. |
+| `makefile-gen` | Detect a project's stack and generate a `Makefile` (`help`/`build`/`run`/`clear` + detected extras) that delegates to existing mise tasks, `package.json` scripts or run scripts. Dry-run unless `--apply`. |
 | `symlink-manager` | Move a config file into the dotfiles repo, link it back, generate management functions, commit. |
 | `ssh-delegate` | Manage SSH key delegation through `~/.ssh/delegations.yml` instead of ad-hoc `ssh-copy-id`, with fingerprint pinning and an audit log. |
 
-The skills were extracted from `dEitY719/dotfiles`
+Three of the skills were extracted from `dEitY719/dotfiles`
 (`claude/skills/devx-{mise-migrate,symlink-manager,ssh-delegate}`) as a snapshot
 — see the first commit for the source SHA. The dotfiles copies are gone: that
 tree was deleted in dotfiles Phase 4-1 (`ad0d33d5`), so this repo is now the
-only home for these three skills.
+only home for those three skills. `makefile-gen` was written here directly
+(issue #14) and has no dotfiles ancestor.
 
 ## Layout: root manifests, one flat `skills/`
 
@@ -66,19 +68,26 @@ at this repo's root, and adding one for tool mappings is a bug.
 - **Invocation form in prose is namespaced.** Body text referring to a skill as
   a command writes `/devenv:ssh-delegate` (or `/devenv-ssh-delegate`).
 - **Progressive disclosure.** `SKILL.md` stays under 100 lines (CI enforces it)
-  and names which `references/` file to read and when. All three are currently
-  at 95-99 lines — there is almost no headroom, so an addition means an
+  and names which `references/` file to read and when. All four are currently
+  at 95-97 lines — there is almost no headroom, so an addition means an
   extraction. Detail lives in `references/`. Do not inline a reference file
   back into `SKILL.md`.
 - **Description budget.** CI sums every skill description and fails past 5,440
   characters — Codex's context budget. Keep new descriptions tight.
-- **Honour each skill's safety contract.** All three write; none of them is a
+- **Honour each skill's safety contract.** All four write; none of them is a
   read-only auditor.
   - `mise-migrate` — `--dry-run` is the default and mutates nothing; only an
     explicit `--apply` writes. It rewrites `pyproject.toml` in place and runs
     `uv sync`, stops at the first failure, and does **not** roll back — it
     reports the partial state. It refuses non-Python and already-migrated
     directories rather than improvising.
+  - `makefile-gen` — `--dry-run` is the default and writes nothing. `--apply`
+    writes only `Makefile`; an existing one is never merged — `--apply`
+    alone refuses, `--apply --force` keeps `Makefile.bak` first. `clear` may
+    delete only allowlisted, gitignored build/test artifacts (never `.env*`,
+    `node_modules`, `.venv`, `.git` or data dirs), `stop` is port-based
+    (`fuser`), never `pkill`, and verification is `make` + `make -n` only.
+    `lib/render.sh --check` enforces the generated-file rules.
   - `symlink-manager` — moves the original file out of its location, so it
     backs it up to `.backup` first and verifies the link; a Phase 1 failure
     restores from that backup. It also `git commit`s. Announce the plan before

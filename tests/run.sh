@@ -12,6 +12,8 @@ CHECKS=(
     skills/mise-migrate/lib/detect_project.sh
     skills/mise-migrate/lib/stale_scan.sh
     skills/symlink-manager/lib/symlink_migrate.sh
+    skills/makefile-gen/lib/detect.sh
+    skills/makefile-gen/lib/render.sh
 )
 
 # Every entry must be a tracked file, and CI must say so by name rather than
