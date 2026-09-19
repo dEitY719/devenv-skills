@@ -21,3 +21,13 @@ jobs:
     uses: dEitY719/harness-skills/.github/workflows/skill-check.yml@main
     with:
       plugin-name: devenv
+
+  # Post-merge patch bump, owned by harness-skills: on a push to main that
+  # changed shipped content, bump X.Y.Z -> X.Y.(Z+1) in every manifest and push
+  # the commit. Needs write access, which only this caller can grant.
+  version-bump:
+    if: github.event_name == 'push'
+    needs: validate
+    permissions:
+      contents: write
+    uses: dEitY719/harness-skills/.github/workflows/version-bump.yml@main
