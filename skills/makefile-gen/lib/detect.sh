@@ -48,8 +48,23 @@ ignored() {
     return 1
 }
 
+# py_mentions <root> <ere>: does pyproject.toml or any requirements*.txt match?
+# Iterates the glob instead of word-splitting a file list, so paths with
+# spaces survive and an unmatched glob is skipped rather than grepped.
+py_mentions() {
+    for _pf in "$1"/pyproject.toml "$1"/requirements*.txt; do
+        [ -f "$_pf" ] && grep -qE "$2" "$_pf" && return 0
+    done
+    return 1
+}
+
 # pkg_scripts <package.json>: comma list of the "scripts" object's keys.
+# jq when present; the awk fallback assumes the usual one-key-per-line layout
+# and can truncate at a `}` inside a script string (e.g. `${VAR}`).
 pkg_scripts() {
+    if command -v jq >/dev/null 2>&1; then
+        jq -r '(.scripts // {}) | keys_unsorted | join(",")' "$1" 2>/dev/null && return
+    fi
     awk '/"scripts"[[:space:]]*:/ {on=1} on {buf = buf $0} on && /}/ {exit} END {print buf}' "$1" \
         | sed 's/.*"scripts"[[:space:]]*:[[:space:]]*{//; s/}.*//' \
         | grep -o '"[^"]*"[[:space:]]*:' | sed 's/"\([^"]*\)".*/\1/' | paste -sd, -
@@ -115,13 +130,12 @@ detect() {
         for f in requirements-dev.txt requirements.txt; do
             [ -f "$root/$f" ] && { add "py_reqs=$f"; break; }
         done
-        pyfiles=$(ls "$root"/pyproject.toml "$root"/requirements*.txt 2>/dev/null)
         if [ -f "$root/pytest.ini" ] || [ -f "$root/conftest.py" ] \
-            || { [ -n "$pyfiles" ] && grep -qE 'pytest' $pyfiles; }; then
+            || py_mentions "$root" 'pytest'; then
             add "py_test=pytest"; pyt=1
         fi
         if [ -f "$root/ruff.toml" ] || [ -f "$root/.ruff.toml" ] \
-            || { [ -n "$pyfiles" ] && grep -qE '(^|[^a-z])ruff' $pyfiles; }; then
+            || py_mentions "$root" '(^|[^a-z])ruff'; then
             add "py_lint=ruff"
         fi
     fi
