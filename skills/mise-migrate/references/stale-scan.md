@@ -17,7 +17,13 @@ sh <skill-dir>/lib/stale_scan.sh <path>
 The legacy-workflow ERE and the exclusion list are the script's, not this
 file's — it is the SSOT for both, so neither is re-applied from memory.
 Output is one `<file>:<line>:<match>` per live hit, then a final
-`excluded=<n>`.
+`excluded=<n>`. One hit is always exactly one **physical line**, so the
+stream is safe to read line by line: `<file>` is printed escaped — a
+backslash as `\\`, a literal newline (POSIX permits one in a path) as `\n`
+— and unescaping those two sequences gives the real path back. `<line>`
+and `<match>` are grep's own and unescaped; a matched line never contains
+a newline. `<file>` may still contain `:`, so recover it by stripping the
+`<path>` you passed in rather than splitting at the first `:`.
 
 Report the hits as `file:line` under a **Stale references** heading in the
 plan, and turn the trailing count into

@@ -15,6 +15,15 @@
 #   <file>:<line>:<match>   one per live (non-excluded) hit, grep's own format
 #   excluded=<n>            always last; hits suppressed as history/archive
 #
+# One hit is always exactly one physical line, so a consumer may read this
+# stream line by line. <file> is printed escaped to make that true: a
+# backslash as \\ and a literal newline (POSIX permits one in a path) as \n.
+# Unescape those two sequences to recover the real path. <line> and <match>
+# are grep's own and are not escaped -- a matched line can never contain a
+# newline. <file> can still contain ':', which is grep -n's own ambiguity:
+# split a record by stripping the <path> argument you passed in, not at the
+# first ':'.
+#
 # exit 0  scan completed (with or without hits -- hits are a finding, not an error)
 # exit 2  usage error, or grep could not read part of <path>: a scan that
 #         skipped files is NOT reported as a clean scan
@@ -43,6 +52,7 @@ Usage:
   stale_scan.sh --self-test
 
 Prints one <file>:<line>:<match> per live hit, then excluded=<n>.
+One hit is one physical line: <file> is escaped (\\ and \n).
 Excluded as history rather than live instructions: **/archive/**,
 **/_archive/**, **/decisions/**, .venv/**, mise.toml, uv.lock, CHANGELOG*,
 and *plan*.md / *spec*.md / *design*.md.
@@ -97,6 +107,31 @@ scan() {
             # Duplicated from the top-level exclusion rules rather than
             # shared: this body runs in a separate sh -c child, and POSIX sh
             # has no way to export a function into it.
+            nl="
+"
+            # The printed record must stay one physical line even when the
+            # path is not: escape backslash as \\ and a literal newline as
+            # \n, so a line-oriented consumer cannot read one hit as two.
+            # Sets $escaped rather than echoing, to keep this fork-free --
+            # it runs once per hit file. A path with neither character comes
+            # through both loops untouched, so ordinary output is unchanged.
+            esc_path() {
+                _r= _s=$1
+                while :; do
+                    case $_s in
+                        *\\*) _r=$_r${_s%%\\*}"\\\\"; _s=${_s#*\\} ;;
+                        *) break ;;
+                    esac
+                done
+                _s=$_r$_s; _r=
+                while :; do
+                    case $_s in
+                        *"$nl"*) _r=$_r${_s%%"$nl"*}"\\n"; _s=${_s#*"$nl"} ;;
+                        *) break ;;
+                    esac
+                done
+                escaped=$_r$_s
+            }
             is_excluded() {
                 p=$1
                 case "/$p" in
@@ -123,8 +158,9 @@ scan() {
                     n=$(grep -cEI -e "$ere" -- "$f") || n=0
                     excl=$((excl + n))
                 else
+                    esc_path "$f"
                     grep -nEI -e "$ere" -- "$f" | while IFS= read -r hit; do
-                        printf "%s:%s\n" "$f" "$hit"
+                        printf "%s:%s\n" "$escaped" "$hit"
                     done
                 fi
             done
@@ -194,21 +230,23 @@ self_test() {
     fi
 
     # A newline in a path (POSIX permits one) must be scanned and reported
-    # intact, not refused and not split into two bogus entries. Compare with
-    # embedded newlines folded to a sentinel byte, so the check itself does
-    # not care whether the record prints across two terminal lines -- only
-    # that the file's full name and its hit are one unbroken substring.
-    nlfile="$tmp/two${_NL}lines.md"
+    # intact, and the record must still be ONE physical line -- otherwise a
+    # consumer reading the stream line by line counts one hit as two. The
+    # fixture carries a backslash too, since escaping the newline as \n is
+    # only unambiguous if a literal backslash is escaped as well. grep -x
+    # is the whole check: it matches only if the escaped record is a
+    # complete line of its own.
+    nlfile="$tmp/b\\s${_NL}x.md"
     printf 'pip install\n' > "$nlfile"
     out=$(scan "$tmp")
     rc=$?
     rm -f "$nlfile"
-    want=$(printf '%s:1:pip install' "$nlfile" | tr '\n' '\001')
-    got=$(printf '%s' "$out" | tr '\n' '\001')
-    if [ "$rc" -eq 0 ] && printf '%s' "$got" | grep -Fq "$want"; then
-        printf 'ok    newline in a path is scanned and reported intact\n'
+    want="$tmp/b\\\\s\\nx.md:1:pip install"
+    if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -qxF -- "$want"; then
+        printf 'ok    newline/backslash path is one escaped physical line\n'
     else
-        printf 'FAIL  newline-path hit missing or split (rc=%s):\n%s\n' "$rc" "$out"; fail=1
+        printf 'FAIL  newline-path record missing or split (rc=%s), want %s:\n%s\n' \
+            "$rc" "$want" "$out"; fail=1
     fi
 
     # An unreadable path must fail the scan, not pass it quietly. Skipped as
