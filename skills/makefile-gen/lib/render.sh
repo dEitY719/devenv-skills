@@ -23,7 +23,7 @@ usage() { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; }
 
 # ---------------------------------------------------------------- facts ------
 load() { # <detect output> -> globals
-    MISE=""; JS=""; SUBS=""; SCRIPTS=""; ARTS=""; DEVSERVER=""; SSTOP=""
+    MISE=""; JS=""; SUBS=""; SCRIPTS=""; ARTS=""; DEVSERVER=""; SSTOP=""; SSETUP=""
     PY=""; PYV=""; PYREQS=""; PYTEST=""; PYLINT=""; PORT=""; PORTS=""; PORTVAR=""; LOG=""; SSUBS=""
     GO=""; CARGO=""; COMPOSE=""; DLANG=en; ST=""; WARNS=""
     _o=$IFS; IFS=$NL
@@ -36,6 +36,7 @@ load() { # <detect output> -> globals
             subapp) SUBS="$SUBS$_v$NL" ;;
             devserver) DEVSERVER=$_v ;; script_stop) SSTOP=$_v ;;
             script) SCRIPTS="$SCRIPTS$_v$NL" ;; script_sub) SSUBS="$SSUBS$_v$NL" ;;
+            script_setup) SSETUP=$_v ;;
             artifact) ARTS="$ARTS $_v" ;;
             py) PY=$_v ;; py_version) PYV=$_v ;; py_reqs) PYREQS=$_v ;;
             py_test) PYTEST=$_v ;; py_lint) PYLINT=$_v ;;
@@ -125,6 +126,11 @@ render() { # <path> -> sets BODY, NAMES, REPORT, VARS
     if mise_t setup; then
         target setup "" "$(L '최초 1회: 의존성 설치' 'First-time setup: install dependencies')" "mise.toml [tasks.setup]"
         r "mise run setup"
+    elif [ -n "$SSETUP" ]; then
+        # The repo already owns its bootstrap; delegate, never copy its logic.
+        _ss=${SSETUP%%|*}
+        target setup "" "$(L '최초 1회: 의존성 설치' 'First-time setup: install dependencies')" "$_ss"
+        r "${SSETUP##*|} ./$_ss"
     elif _sh=$(sub_hits setup); [ -n "$PY$JS$_sh" ]; then
         _v=$(printf '%s' "$PYV" | cut -d. -f1,2)
         _pd=""; _s=""
@@ -440,6 +446,25 @@ self_test() {
         && recipe test "$k/Makefile" | grep -qx "${TAB}cd backend && uv run pytest" \
         && ok "sub-app without mise -> uv sync / uv run pytest" || ko "sub-app uv fallback"
 
+    # agent-toolbox shape: root bun workspace, uv app under apps/, scripts/setup.sh
+    t=$tmp/at; mkdir -p "$t/apps/server" "$t/scripts"
+    printf 'dist/\n' > "$t/.gitignore"
+    printf '{"scripts":{"dev":"x","build":"y","lint":"z","format":"w"}}\n' > "$t/package.json"
+    : > "$t/bun.lock"
+    printf '[project]\ndependencies = ["pytest", "ruff"]\n' > "$t/apps/server/pyproject.toml"
+    : > "$t/apps/server/uv.lock"
+    printf '#!/usr/bin/env bash\nbun install\n' > "$t/scripts/setup.sh"
+    gen "$t" && ok "agent-toolbox shape passes --check" || ko "agent-toolbox --check"
+    [ "$(recipe setup "$t/Makefile")" = "${TAB}bash ./scripts/setup.sh" ] \
+        && main "$t" --report | grep -qxF "target=setup${TAB}source=scripts/setup.sh" \
+        && ok "setup delegates to scripts/setup.sh" || ko "setup delegation: $(recipe setup "$t/Makefile")"
+    [ "$(recipe test "$t/Makefile")" = "${TAB}cd apps/server && uv run pytest" ] \
+        && [ "$(recipe lint "$t/Makefile")" = "${TAB}bun run lint${NL}${TAB}cd apps/server && uv run ruff check ." ] \
+        && [ "$(recipe fmt "$t/Makefile")" = "${TAB}bun run format${NL}${TAB}cd apps/server && uv run ruff format ." ] \
+        && ok "sub-app under apps/ joins test/lint/fmt" || ko "nested sub-app: $(cat "$t/Makefile")"
+    [ "$(recipe clear "$t/Makefile")" = "${TAB}rm -rf dist apps/server/dist apps/server/.pytest_cache" ] \
+        && ok "clear lists each artifact once" || ko "clear: $(recipe clear "$t/Makefile")"
+
     # quantfolio shape: uv root + nested vite app, two-server script, tools/dev.sh
     q=$tmp/qf; mkdir -p "$q/src/frontend" "$q/scripts" "$q/tools"
     : > "$q/pyproject.toml"; : > "$q/uv.lock"; printf 'pytest\nruff\n' > "$q/requirements.txt"
@@ -496,7 +521,7 @@ self_test() {
 
     if [ "$hasmake" -eq 1 ]; then
         gen "$q"
-        for d in "$b" "$m" "$e" "$a" "$k" "$q"; do verify "$d" >/dev/null && ok "verify $(basename "$d")" || ko "verify $d: $(verify "$d")"; done
+        for d in "$b" "$m" "$e" "$a" "$k" "$q" "$t"; do verify "$d" >/dev/null && ok "verify $(basename "$d")" || ko "verify $d: $(verify "$d")"; done
         o=$(make --no-print-directory -C "$e" build 2>&1) && [ "$o" = "no build step" ] && ok "no-stack make build -> exit 0" || ko "no-stack build: $o"
     else printf 'skip  make not on PATH -- verify cases not run\n'; fi
 
