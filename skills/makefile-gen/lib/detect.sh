@@ -15,12 +15,13 @@
 #   mise_task=<name>                (repeat) [tasks.<name>] in mise.toml
 #   js=<dir>|<runner>|<s1,s2,...>   (repeat) package.json dir, runner, scripts
 #   py=<uv|pip>  py_version=<v>  py_reqs=<file>  py_test=pytest  py_lint=ruff
-#   subapp=<dir>|<uv|pip|->|<pytest,ruff,req:F>|<mise tasks>  (repeat)
-#                                   Python and/or mise.toml in an immediate
-#                                   subdir (only when the root has no Python)
+#   subapp=<rel>|<uv|pip|->|<pytest,ruff,req:F>|<mise tasks>  (repeat)
+#                                   Python and/or mise.toml in a subdir,
+#                                   apps/* or src/* (root has no Python)
 #   script=<rel>|<bash|sh>          (repeat) run-*.sh, scripts/{dev,start,run}.sh
 #   script_sub=<rel>|<bash|sh>|<test|lint|fmt>  (repeat) case arm in one of
 #                                   those scripts or tools/dev.sh; first wins
+#   script_setup=<rel>|<bash|sh>    scripts/setup.sh, else setup.sh
 #   port=<n>                        (repeat) every port in the first server
 #                                   script, then vite.config server.port
 #   port_var=<NAME>  log=<path>     from the first server script
@@ -39,7 +40,7 @@ set -u
 ALLOW='dist build out coverage .pytest_cache __pycache__ test-results playwright-report target .next .turbo'
 
 usage() {
-    sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,34p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 # ignored <root> <rel>: is <rel> matched by <root>/.gitignore or by the
@@ -160,11 +161,13 @@ detect() {
         has_pytest "$root" && { add "py_test=pytest"; pyt=" . "; }
         has_ruff "$root" && add "py_lint=ruff"
     else
-        # Sub-apps: an immediate subdir with Python and/or mise tasks, the way
-        # frontend/ is a JS sub-app. A root Python project owns the env instead.
-        for d in "$root"/*/; do
-            d=${d%/}; n=${d##*/}
-            case " $jsdirs " in *" $n "*) continue ;; esac
+        # Sub-apps: a subdir with Python and/or mise tasks, the way frontend/
+        # is a JS sub-app -- same globs and same root-relative naming, so every
+        # `cd <dir>` recipe built from one resolves from the repo root.
+        # A root Python project owns the env instead.
+        for d in "$root"/*/ "$root"/apps/*/ "$root"/src/*/; do
+            d=${d%/}; n=${d#"$root"/}
+            case " $jsdirs $subdirs " in *" $n "*) continue ;; esac
             sp=$(py_kind "$d"); mt=$(mise_tasks "$d" | paste -sd, -)
             [ -n "$sp$mt" ] || continue
             fl=""
@@ -187,6 +190,13 @@ detect() {
             case " $subs " in *" $a "*) continue ;; esac
             has_arm "$s" "$a" && { add "script_sub=${s#"$root"/}|$sh_|$a"; subs="$subs $a"; }
         done
+    done
+    # The repo's own dependency bootstrap: `setup` delegates to it instead of
+    # reconstructing what it already does from the manifests.
+    for s in "$root"/scripts/setup.sh "$root"/setup.sh; do
+        [ -f "$s" ] || continue
+        head -n1 "$s" | grep -q bash && sh_='bash' || sh_='sh'
+        add "script_setup=${s#"$root"/}|$sh_"; found=1; break
     done
     ports=""
     if [ -n "$first" ]; then
@@ -219,7 +229,7 @@ $(sed -n 's/^[[:space:]]*port:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$root/$d"/vit
 
     # clear targets: allowlist names at the root and in each app dir,
     # kept only if a .gitignore covers them. pytest self-ignores its cache.
-    for d in . $jsdirs $subdirs; do
+    for d in $(printf '%s\n' . $jsdirs $subdirs | awk 'NF && !s[$0]++'); do
         for a in $ALLOW; do
             rel=$a; [ "$d" = . ] || rel="$d/$a"
             case "$a" in __pycache__) [ "$d" = . ] || continue ;; esac
@@ -325,6 +335,26 @@ EOF
     want "pip sub-app with requirements" "$p" 'subapp=api|pip|ruff,req:requirements.txt|'
     : > "$p/pyproject.toml"
     deny "root Python owns the env -> no sub-apps" "$p" '^subapp='
+
+    # agent-toolbox shape: a root package.json workspace, a uv app one level
+    # below apps/, and scripts/setup.sh.
+    t=$tmp/at; mkdir -p "$t/apps/server" "$t/apps/web" "$t/scripts"
+    printf 'dist/\n' > "$t/.gitignore"
+    printf '{"scripts":{"dev":"x","build":"y","lint":"z","format":"w"}}\n' > "$t/package.json"
+    : > "$t/bun.lock"
+    printf '{"scripts":{"build":"y"}}\n' > "$t/apps/web/package.json"
+    printf '[project]\ndependencies = ["pytest>=8", "ruff>=0.7"]\n' > "$t/apps/server/pyproject.toml"
+    : > "$t/apps/server/uv.lock"
+    printf '#!/usr/bin/env bash\nbun install\n' > "$t/scripts/setup.sh"
+    want "sub-app under apps/ + setup script" "$t" 'js=.|bun|dev,build,lint,format' \
+        'subapp=apps/server|uv|pytest,ruff|' 'script_setup=scripts/setup.sh|bash' \
+        artifact=dist artifact=apps/server/dist artifact=apps/server/.pytest_cache
+    deny "sub-app name is the root-relative path, never the basename" "$t" '^subapp=server[|]'
+    deny "a JS-only sub-app is not a Python sub-app" "$t" '^subapp=apps/web'
+    [ "$(detect "$t" | grep -c '^artifact=dist$')" = 1 ] && printf 'ok    root artifacts not duplicated\n' \
+        || { printf 'FAIL  root artifacts duplicated\n'; fail=1; }
+    rm "$t/scripts/setup.sh"; printf '#!/bin/sh\nbun install\n' > "$t/setup.sh"
+    want "root setup.sh is the fallback" "$t" 'script_setup=setup.sh|sh'
 
     # quantfolio shape: root uv Python, nested JS app, two-server run script,
     # tools/dev.sh with test)/fmt| case arms.
