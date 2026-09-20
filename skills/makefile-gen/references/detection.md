@@ -25,7 +25,7 @@ bug. `detect.sh --help` prints the key list.
 | `run-*.sh`, `scripts/{dev,start,run}.sh` | `script=<rel>\|<bash\|sh>` | `run`/`serve` call the first one (with its shebang interpreter), never re-implement its restart logic |
 | A `test)` / `lint)` / `fmt)` case arm (also `fmt\|format)`) in one of those scripts or `tools/dev.sh`; first script per name wins | `script_sub=<rel>\|<bash\|sh>\|<name>` | `test`/`lint`/`fmt` → `<bash\|sh> ./<rel> <name>` in place of the root direct command (pytest/ruff/go/cargo). Only arms that exist are used. `tools/dev.sh` is a dispatcher, never the run script |
 | `scripts/setup.sh`, else `setup.sh` | `script_setup=<rel>\|<bash\|sh>` | `setup` becomes the one line `<bash\|sh> ./<rel>`, above the manifest-derived recipe and below `[tasks.setup]` — the repo owns its bootstrap, so the target delegates instead of copying it |
-| Every `${X_PORT:-N}`, `--port N`, `X_PORT=N` in that script, then `server.port: N` in a JS app's `vite.config.*`; deduplicated, in that order | `port=N` (repeat), `port_var=X_PORT` (first `${X_PORT:-N}`) | One port: `PORT ?= N`. Several (one script starting backend + frontend): `PORTS ?= N M`, and `stop`/`status` loop over them. `serve` passes `X_PORT=$(PORT)` |
+| Every `${X_PORT:-N}`, `--port N`, `X_PORT=N` in the **code half** of that script — everything from the first `#` that starts a word outside quotes is dropped first, so a usage header (`# WEB_PORT=9000 ./run-web.sh`) contributes nothing while `--port 8080  # default` still counts — then `server.port: N` in a JS app's `vite.config.*`; deduplicated. The `${X_PORT:-N}` default comes first whatever the file order: that expansion is the script's own default, a bare `X_PORT=N` elsewhere is one caller's choice | `port=N` (repeat, first = `PORT ?=`), `port_var=X_PORT` (first `${X_PORT:-N}`) | One port: `PORT ?= N`. Several (one script starting backend + frontend): `PORTS ?= N M`, and `stop`/`status` loop over them. `serve` passes `X_PORT=$(PORT)` and echoes `http://localhost:$(PORT)/` |
 | `LOG:-<path>.log` or `> /abs/path.log` in that script | `log=` | `LOG :=` (with `${PORT}` → `$(PORT)`) and `logs` |
 | A `stop)` / `down)` case arm in that script (also `a\|stop)`), `stop` preferred | `script_stop=` | `stop` → `<bash\|sh> ./<script> stop\|down`, before the port rule |
 | Dev-server signal in that script (word match: `vite`, `run dev`, `next dev`, `webpack serve`, `--reload`) | `devserver=<signal>` | `run` calls the script directly, no `serve` (it builds/serves for itself) |
@@ -56,6 +56,12 @@ directories, which is exactly what `clear` must not touch.
 | `no-path` | 1 | `<path>` missing or not a directory — stop with a one-line `[FAIL]`. |
 
 ## Monorepos
+
+An app dir whose path contains whitespace is skipped with
+`warn=<app|sub-app> dir skipped, whitespace in path: <rel>`. The dir lists
+here are space-separated strings that later loops split on, and no Make
+target or recipe could name such a path either, so it is dropped loudly
+rather than silently emitted as half a directory name.
 
 A root `package.json` owns the workspace, so JS sub-apps are only scanned when
 the root has none. Likewise a root Python project owns the env, so

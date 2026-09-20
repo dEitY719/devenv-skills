@@ -23,7 +23,7 @@
 |------|---------|-------------|
 | `--dry-run` | **on** | Default. Prints the detection table, the Makefile (or a diff against the existing one), target sources and skipped targets; writes nothing. |
 | `--apply` | off | Writes `<path>/Makefile`, then verifies it with `make` + `make -n <target>`. Refuses when a Makefile already exists. |
-| `--force` | off | With `--apply`, replace an existing Makefile after copying it to `Makefile.bak`. |
+| `--force` | off | With `--apply`, replace an existing Makefile after copying it to `Makefile.bak`. Everything below `# --- custom (kept by makefile-gen) ---` in the old file is carried over verbatim; without that line nothing can be kept, and the report names each target that would be dropped. |
 | `--port N` | detected | Server port for `PORT ?=`. Overrides the port found in a run script; also enables `stop`/`status` for a server whose port is not in any script. |
 | `--lang ko\|en` | README | Language of the `##` help descriptions. Without it: `ko` when the README contains Hangul, else `en`. |
 | `-h` / `--help` / `help` | — | Print this help and stop. No detection, no file mutation. |
@@ -55,7 +55,8 @@ compose), `build-<app>` (several sub-apps), and one target per remaining
 ## What the skill will NOT do
 
 - Merge into an existing Makefile — it replaces (with `--force` + `.bak`)
-  or refuses.
+  or refuses. The region below the custom sentinel is copied as-is, which is
+  a copy and not a merge: the skill never reads what is in it.
 - Copy command logic out of `mise.toml`, `package.json` or run scripts —
   recipes call them.
 - Let `clear` touch `.env*`, credentials, `node_modules`, `.venv`, `.git`

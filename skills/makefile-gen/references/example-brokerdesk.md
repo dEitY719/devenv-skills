@@ -2,9 +2,20 @@
 
 The reference Makefile this skill was modeled on. brokerdesk is a FastAPI
 backend (`web/`, pip + `.venv`, Python 3.12 pinned) serving an Expo web build
-(`frontend/`, bun), restarted by `run-web.sh`. Below: what `detect.sh` sees,
-what `render.sh` produces, and how that differs from the hand-written PR #76
-Makefile. Captured by running both scripts against a copy of the repo.
+(`frontend/`, bun), restarted by `run-web.sh`, with `mise.toml` owning ruff.
+Below: what `detect.sh` sees, what `render.sh` produces, and how that differs
+from the hand-written PR #76 Makefile.
+
+**Re-capturing this page is mechanical** — the three blocks below are the
+verbatim stdout of these commands, in order, with `$HOME` folded to `~` in the
+first one. Run them again after any change to `lib/`, and paste:
+
+```sh
+cd skills/makefile-gen
+sh lib/detect.sh ~/para/project/brokerdesk
+sh lib/render.sh ~/para/project/brokerdesk --report
+sh lib/render.sh ~/para/project/brokerdesk
+```
 
 ## 1. Detection (`detect.sh ~/para/project/brokerdesk`)
 
@@ -13,15 +24,19 @@ path=~/para/project/brokerdesk
 status=ok
 makefile=present
 lang=ko
+mise_task=lint
+mise_task=fmt-check
+mise_task=fmt
 js=frontend|bun|start,web,build:web,gen:api,test,copy-canvaskit,test:e2e
 py=pip
 py_version=3.12
 py_reqs=requirements-dev.txt
 py_test=pytest
+py_lint=ruff
 script=run-web.sh|bash
-port=8888
 port_var=WEB_PORT
 log=/tmp/web-${PORT}.log
+port=8888
 artifact=.pytest_cache
 artifact=__pycache__
 artifact=frontend/dist
@@ -33,6 +48,7 @@ artifact=frontend/playwright-report
 |---|---|---|
 | Python | pip + `.venv`, 3.12 | `requirements-dev.txt`, `.python-version` |
 | Tests | pytest | `pytest.ini` |
+| Lint | ruff, through mise | `ruff.toml`; `mise.toml` `[tasks.{lint,fmt-check,fmt}]` |
 | JS sub-app | `frontend`, bun | `frontend/package.json`, `frontend/bun.lock` |
 | Server script | `run-web.sh` (bash) | `run-web.sh` shebang |
 | Port | 8888 via `WEB_PORT` | `PORT="${WEB_PORT:-8888}"` in `run-web.sh` |
@@ -44,11 +60,18 @@ No root `package.json`, so `run` resolves to the run script (priority 3)
 rather than `frontend`'s `start` (sub-app, priority 4). `build:web` is a real
 build step and the script serves its output, so `run: build serve`.
 
+The usage header of `run-web.sh` documents its own override
+(`#   WEB_PORT=9000 ./run-web.sh`). That line is a comment, so it is not a
+port: detection reads the code half of each line only, and the
+`${WEB_PORT:-8888}` expansion — the script's own default — heads the list.
+
 ## 2. Report (`render.sh ... --report`)
 
 ```
+warn=custom target backup-db not preserved (no sentinel; move it below the sentinel to keep it)
+warn=custom target backups not preserved (no sentinel; move it below the sentinel to keep it)
 target=help	source=skill template
-target=setup	source=requirements-dev.txt + .python-version + package.json
+target=setup	source=requirements-dev.txt + .python-version + frontend/package.json
 target=build	source=frontend/package.json scripts.build:web
 target=run	source=build + serve
 target=serve	source=run-web.sh
@@ -58,12 +81,18 @@ target=logs	source=run-web.sh log redirect
 target=test	source=pytest, frontend/package.json scripts.test
 target=test-e2e	source=frontend/package.json scripts.test:e2e
 target=test-all	source=test + test-e2e
-skip=lint	reason=no lint tool detected
-skip=fmt	reason=no fmt tool detected
+target=lint	source=mise.toml [tasks.lint] + [tasks.fmt-check]
+target=fmt	source=mise.toml [tasks.fmt]
 target=gen-api	source=frontend/package.json scripts.gen:api
 target=clear	source=allowlist x .gitignore
 target=clean	source=alias of clear
 ```
+
+The two `warn=` lines are the state of the checkout, not a defect: the
+hand-written Makefile predates the custom sentinel, so `--apply --force`
+would drop `backup-db` and `backups`. Moving those two targets below
+`# --- custom (kept by makefile-gen) ---` once is what makes the warnings —
+and the risk — go away for good.
 
 ## 3. Generated Makefile
 
@@ -74,9 +103,10 @@ target=clean	source=alias of clear
 PORT ?= 8888
 PY   := $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 LOG  := /tmp/web-$(PORT).log
+FRONTEND := frontend
 
 .DEFAULT_GOAL := help
-.PHONY: help setup build run serve stop status logs test test-e2e test-all gen-api clear clean
+.PHONY: help setup build run serve stop status logs test test-e2e test-all lint fmt gen-api clear clean
 
 help: ## 이 도움말
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  make %-10s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -84,73 +114,84 @@ help: ## 이 도움말
 setup: ## 최초 1회: .venv (Python 3.12) + 의존성 설치
 	@test -x .venv/bin/python || { PYV=$$(command -v python3.12 || command -v python3); "$$PYV" -m venv .venv; }
 	.venv/bin/pip install -q -r requirements-dev.txt
-	cd frontend && bun install
+	cd $(FRONTEND) && bun install
 
 build: ## 빌드
-	cd frontend && bun run build:web
+	cd $(FRONTEND) && bun run build:web
 
 run: build serve ## 빌드 후 서버 (재)기동 -- 코드를 바꿨으면 이것
 
 serve: ## 빌드 없이 서버 (재)기동 -- 산출물이 없으면 멈춘다
-	@test -e frontend/dist || { echo "frontend/dist 없음 -- 먼저 make build"; exit 1; }
+	@test -e $(FRONTEND)/dist || { echo "$(FRONTEND)/dist 없음 -- 먼저 make build"; exit 1; }
 	WEB_PORT=$(PORT) bash ./run-web.sh
+	@echo "  -> http://localhost:$(PORT)/"
 
 stop: ## 서버 종료(포트 기준 -- 같은 이름의 다른 프로세스는 건드리지 않는다)
 	@if fuser $(PORT)/tcp >/dev/null 2>&1; then fuser -k -TERM $(PORT)/tcp >/dev/null 2>&1; echo "종료 요청: $(PORT)"; else echo "떠 있는 서버 없음: $(PORT)"; fi
 
 status: ## 서버·빌드 상태
 	@if fuser $(PORT)/tcp >/dev/null 2>&1; then echo "실행 중: $(PORT)"; else echo "정지: $(PORT)"; fi
-	@test -e frontend/dist && echo "frontend/dist 있음" || echo "frontend/dist 없음 -- make build"
+	@test -e $(FRONTEND)/dist && echo "$(FRONTEND)/dist 있음" || echo "$(FRONTEND)/dist 없음 -- make build"
 
 logs: ## 서버 로그 따라 보기(Ctrl+C 로 종료)
 	tail -f $(LOG)
 
 test: ## 단위 테스트
 	$(PY) -m pytest
-	cd frontend && bun run test
+	cd $(FRONTEND) && bun run test
 
 test-e2e: ## E2E 테스트
-	cd frontend && bun run test:e2e
+	cd $(FRONTEND) && bun run test:e2e
 
 test-all: test test-e2e ## test + test-e2e
 
+lint: ## 린트 + 포맷 검사 -- CI 와 같은 검사
+	mise run lint
+	mise run fmt-check
+
+fmt: ## 포맷 -- make lint 가 빨갛게 나올 때
+	mise run fmt
+
 gen-api: ## gen:api 스크립트로 생성물 재생성
-	cd frontend && bun run gen:api
+	cd $(FRONTEND) && bun run gen:api
 
 clear: ## 빌드·테스트 산출물 정리(의존성·비밀·데이터는 남긴다)
-	rm -rf .pytest_cache frontend/dist frontend/test-results frontend/playwright-report
+	rm -rf .pytest_cache $(FRONTEND)/dist $(FRONTEND)/test-results $(FRONTEND)/playwright-report
 	find . -path '*/.*' -prune -o -name node_modules -prune -o -type d -name __pycache__ -prune -exec rm -rf {} +
 
 clean: clear ## clear 와 같다
+
+# --- custom (kept by makefile-gen) ---
 ```
 
-`make` (help) and `make -n <target>` pass for all 14 targets
+`make` (help) and `make -n <target>` pass for all 16 targets
 (`render.sh --verify`). `test-e2e` is listed thanks to the `0-9` in the help
 regex.
 
 ## 4. Differences from the PR #76 Makefile
 
-Target set: **identical** — `help setup build run serve stop status logs test
-test-e2e test-all gen-api clear clean`, same `.PHONY` order, same
-`.DEFAULT_GOAL := help`, same awk help line. Meanings match; differences are
-wording or deliberate generalizations:
+Target set: the generated one is PR #76's — `help setup build run serve stop
+status logs test test-e2e test-all lint fmt gen-api clear clean` — minus
+`backup-db` and `backups`, which are project logic with no detectable source
+and live below the sentinel. Same `.DEFAULT_GOAL := help`, same awk help
+line, `FRONTEND := frontend` in both. Meanings match; differences are wording
+or deliberate generalizations:
 
 | Target | PR #76 | Generated | Why |
 |---|---|---|---|
-| header / vars | project prose; `FRONTEND := frontend` | generic header; literal `frontend` paths | no project prose to detect; one fewer indirection |
+| header / vars | project prose; `DATA`/`BACKUPS`/`KEEP` | generic header; `PORT`/`PY`/`LOG`/`FRONTEND` | no project prose to detect; the other three belong to the two custom targets |
 | `setup` | finds 3.12 via `pyenv which`, `python3.12`, then `~/.pyenv/versions/3.12.11` | `command -v python3.12 \|\| command -v python3` | the pyenv fallback path is machine-specific |
-| `serve` | guard `frontend/dist/index.html`; `./run-web.sh`; echoes the `/app/` URL | guard `frontend/dist`; `bash ./run-web.sh`; no echo | index file and URL path are app-specific; shebang interpreter survives a checkout without the exec bit |
+| `serve` | guard `$(FRONTEND)/dist/index.html`; `./run-web.sh`; echoes the `/app/` URL | guard `$(FRONTEND)/dist`; `bash ./run-web.sh`; echoes `http://localhost:$(PORT)/` | the index file and the path under the origin are app-specific; the origin is not; shebang interpreter survives a checkout without the exec bit |
 | `status` | also prints dist mtime and curls `/api/config?broker=toss` | port + dist presence only | the endpoint is app knowledge, not detectable |
 | `test` | `$(PY) -m pytest -q` | `$(PY) -m pytest` | `pytest.ini` `addopts` already carries `-q` |
-| `clear` | `find` prunes `./.venv` and `./frontend/node_modules` | `find` prunes every dot-dir and every `node_modules` | same effect, holds for any layout |
+| `lint` | `mise run lint` + `mise run fmt-check` | identical | the fmt-check task next to lint is what CI runs |
+| `clear` | `find` prunes `./.venv` and `./$(FRONTEND)/node_modules` | `find` prunes every dot-dir and every `node_modules` | same effect, holds for any layout |
 | messages | Korean with symbol bullets | Korean, ASCII only | devenv no-emoji rule; plain text is safest in any terminal |
-
-`lint` / `fmt` are skipped in both: brokerdesk has no ruff or eslint.
 
 ## 5. Existing Makefile
 
-The local checkout used for this run still had the pre-#76 Makefile
-(`run`/`test` taking `backend`/`frontend` pseudo-targets). Dry-run therefore
-printed a `diff -u` instead of the full text, `--apply` alone refused, and
-`--apply --force` wrote the generated file after copying the old one to
-`Makefile.bak`.
+The checkout used for this run has the hand-written PR #76 Makefile and no
+sentinel, so dry-run prints a `diff -u` instead of the full text, `--apply`
+alone refuses, and `--apply --force` would write the generated file after
+copying the old one to `Makefile.bak` — carrying nothing over, which is what
+the two `warn=custom target ... not preserved` lines in section 2 say.
