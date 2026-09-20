@@ -75,9 +75,11 @@ End with `Plan ready: <path> (targets=<n>, skipped=<m>)` and
 Stop at the first failure with `[FAIL] devenv:makefile-gen <reason>` + exit 1:
 
 1. `makefile=present` without `--force` → refuse; write nothing. The skill
-   never merges into an existing Makefile (`references/constraints.md`).
-2. Render into a temp file and run `sh <skill-dir>/lib/render.sh --check <tmp>`; a failure
-   means the renderer broke its own contract — report it, write nothing.
+   never merges (`references/constraints.md`): it copies the region below
+   the custom sentinel over, and each `warn=` names a target that has none.
+2. Render into a **temp file** — a redirect over `<path>/Makefile` truncates
+   that region away — and `sh <skill-dir>/lib/render.sh --check <tmp>`; a
+   failure means the renderer broke its own contract: report it, write nothing.
 3. With `--force` and an existing Makefile, `cp Makefile Makefile.bak`.
 4. Copy the temp file to `<path>/Makefile`.
 5. Verify: `sh <skill-dir>/lib/render.sh --verify <path>` runs `make` (help must list every

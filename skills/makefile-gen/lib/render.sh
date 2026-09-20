@@ -11,6 +11,8 @@
 #
 # Rendering and --check never write; --verify runs make in dry-run (-n) mode
 # only, apart from `make` itself, which runs the side-effect-free help target.
+# The generated text ends with the custom sentinel; whatever <path>/Makefile
+# already has below that line is copied over verbatim, never parsed.
 # Mapping rules: references/target-catalog.md. POSIX sh only.
 
 set -u
@@ -18,8 +20,15 @@ HERE=$(dirname "$0")
 TAB=$(printf '\t')
 NL='
 '
+# Everything below this line in a Makefile belongs to the user. It is copied
+# across a regeneration as-is: never read, checked, merged or reordered.
+SENTINEL='# --- custom (kept by makefile-gen) ---'
 
-usage() { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; }
+
+# gen_part / keep_region <makefile>: the two halves, split at the sentinel.
+gen_part() { awk -v s="$SENTINEL" '$0 == s {exit} {print}' "$1"; }
+keep_region() { awk -v s="$SENTINEL" 'f {print} $0 == s {f = 1}' "$1"; }
 
 # ---------------------------------------------------------------- facts ------
 load() { # <detect output> -> globals
@@ -207,6 +216,11 @@ render() { # <path> -> sets BODY, NAMES, REPORT, VARS
                 if [ -n "$GUARD" ]; then r "@test -e $GUARD || { echo \"$(L "$GUARD 없음 -- 먼저 make build" "$GUARD missing -- run make build first")\"; exit 1; }"
                 else skip serve-guard "no allowlisted build output dir detected"; fi
                 r "$SCMD"
+                # The path under it is app knowledge, but the origin is not.
+                case "${PORTS# }" in
+                    *" "*) r "@for p in \$(PORTS); do echo \"  -> http://localhost:\$\$p/\"; done" ;;
+                    ?*) r "@echo \"  -> http://localhost:\$(PORT)/\"" ;;
+                esac
             else
                 target run "" "$(L '서버 (재)기동' '(Re)start the server')" "$_sp"; r "$SCMD"
             fi ;;
@@ -269,8 +283,25 @@ render() { # <path> -> sets BODY, NAMES, REPORT, VARS
 
     # lint / fmt
     for _t in lint fmt; do
-        [ "$_t" = lint ] && _d=$(L '린트' 'Lint') || _d=$(L '포맷' 'Format')
-        if mise_t "$_t"; then target "$_t" "" "$_d" "mise.toml [tasks.$_t]"; r "mise run $_t"; continue; fi
+        if [ "$_t" = lint ]; then _d=$(L '린트' 'Lint')
+        elif has_t lint; then _d=$(L '포맷 -- make lint 가 빨갛게 나올 때' 'Format -- run it when make lint is red')
+        else _d=$(L '포맷' 'Format'); fi
+        if mise_t "$_t"; then
+            # A fmt-check task next to lint is what CI runs, so `make lint`
+            # runs the pair -- a lint that passes on code CI rejects is the
+            # failure this target exists to prevent. fmt-check is then not
+            # emitted again by the catch-all "any other mise task" rule.
+            _fc=""
+            if [ "$_t" = lint ]; then
+                for _n in fmt-check format-check lint:fmt; do
+                    mise_t "$_n" && { _fc=$_n; break; }
+                done
+                [ -n "$_fc" ] && _d=$(L '린트 + 포맷 검사 -- CI 와 같은 검사' 'Lint + format check -- the pair CI runs')
+            fi
+            target "$_t" "" "$_d" "mise.toml [tasks.$_t]${_fc:+ + [tasks.$_fc]}"
+            r "mise run $_t"; [ -n "$_fc" ] && r "mise run $_fc"
+            continue
+        fi
         [ "$_t" = lint ] && _h=$(js_hits lint) || _h=$(js_hits format fmt)
         _sh=$(sub_hits "$_t"); _rl=$PYLINT
         # A run/dev script's own `lint)`/`fmt)` arm replaces the direct ruff call.
@@ -327,6 +358,39 @@ render() { # <path> -> sets BODY, NAMES, REPORT, VARS
     esac
     [ "$PY" = pip ] && VARS="${VARS}PY   := \$(if \$(wildcard .venv/bin/python),.venv/bin/python,python3)$NL"
     [ -n "$LOG" ] && has_t logs && VARS="${VARS}LOG  := $(printf '%s' "$LOG" | sed 's/\${PORT}/$(PORT)/g; s/\$PORT/$(PORT)/g')$NL"
+    dir_vars
+}
+
+# dir_vars: an app dir named three or more times across the recipes becomes a
+# variable, so renaming the app stays a one-line edit. Recipes only -- the
+# help awk prints `##` text raw, so a $(VAR) in a description would show up
+# literally. Longest path first, so `src/frontend` claims the name before
+# plain `frontend` could rewrite half of it.
+dir_vars() {
+    for _d in $(printf '%s%s' "$JS" "$SUBS" | cut -d'|' -f1 | grep -v '^\.$' \
+        | awk 'NF {print length, $0}' | sort -rn -k1,1 | cut -d' ' -f2- | awk '!s[$0]++'); do
+        _v=$(printf '%s' "${_d##*/}" | tr 'a-z-' 'A-Z_' | tr -c 'A-Z0-9_\n' '_')
+        case " PORT PORTS PY LOG $(printf '%s' "$VARS" | cut -d' ' -f1 | tr '\n' ' ')" in
+            *" $_v "*) continue ;;
+        esac
+        _b=$(printf '%s' "$BODY" | awk -v t="$TAB" -v d="$_d" -v v="\$($_v)" '
+            function subst(l,   o, i, p, nx, pc) {
+                o = ""; p = 1
+                while ((i = index(substr(l, p), d)) > 0) {
+                    i = p + i - 1
+                    pc = (i > 1) ? substr(l, i - 1, 1) : ""
+                    nx = substr(l, i + length(d), 1)
+                    if (pc !~ "[A-Za-z0-9_./-]" && nx !~ "[A-Za-z0-9_.-]") {
+                        o = o substr(l, p, i - p) v; n++
+                    } else { o = o substr(l, p, i - p + length(d)) }
+                    p = i + length(d)
+                }
+                return o substr(l, p)
+            }
+            { L[NR] = (substr($0, 1, 1) == t) ? subst($0) : $0 }
+            END { if (n < 3) exit 1; for (k = 1; k <= NR; k++) print L[k] }') \
+            && { BODY="$_b$NL"; VARS="${VARS}$_v := $_d$NL"; }
+    done
 }
 
 emit_makefile() {
@@ -334,6 +398,9 @@ emit_makefile() {
     printf '# Regenerate: /devenv:makefile-gen --apply --force (keeps Makefile.bak).\n\n'
     [ -n "$VARS" ] && printf '%s\n' "$VARS"
     printf '.DEFAULT_GOAL := help\n.PHONY:%s\n%s' "$NAMES" "$BODY"
+    printf '\n%s\n' "$SENTINEL"
+    [ -n "$KEEP" ] && printf '%s\n' "$KEEP"
+    return 0
 }
 
 # ---------------------------------------------------------------- check ------
@@ -343,18 +410,22 @@ check() {
     f=$1; bad=0
     no() { printf 'FAIL  %s: %s\n' "$f" "$1"; bad=1; }
     [ -f "$f" ] || { no "not a file"; return 1; }
-    grep -q '^\.DEFAULT_GOAL := help' "$f" || no ".DEFAULT_GOAL := help missing"
-    grep -qF '/^[a-zA-Z0-9_-]+:.*## /' "$f" || no "help awk regex must be ^[a-zA-Z0-9_-]+:.*## "
-    grep -qE '^\.ONESHELL|\$\(file ' "$f" && no "GNU Make 4.x-only construct (.ONESHELL / \$(file))"
-    grep -qE '^[a-zA-Z0-9_-]+:.*## .*\$\(' "$f" && no "\$(VAR) inside a ## description (awk prints it raw)"
-    grep -qE 'pkill|killall' "$f" && no "name-based kill (pkill/killall); stop must be port-based"
-    if grep -q '^stop:' "$f"; then recipe stop "$f" | grep -qE -e 'fuser \$\(PORT\)/tcp' -e 'for p in \$\(PORTS\); do if fuser \$\$p/tcp' -e '^	(bash|sh) \./[^ ]+ (stop|down)$' \
+    # Only the generated region is the skill's to judge. What a user keeps
+    # below the sentinel may use any tooling, and .PHONY never covers it.
+    _g=$(gen_part "$f"); G() { printf '%s\n' "$_g"; }
+    G | grep -q '^\.DEFAULT_GOAL := help' || no ".DEFAULT_GOAL := help missing"
+    G | grep -qF '/^[a-zA-Z0-9_-]+:.*## /' || no "help awk regex must be ^[a-zA-Z0-9_-]+:.*## "
+    grep -qxF "$SENTINEL" "$f" || no "custom sentinel missing (a regeneration would drop hand-written targets)"
+    G | grep -qE '^\.ONESHELL|\$\(file ' && no "GNU Make 4.x-only construct (.ONESHELL / \$(file))"
+    G | grep -qE '^[a-zA-Z0-9_-]+:.*## .*\$\(' && no "\$(VAR) inside a ## description (awk prints it raw)"
+    G | grep -qE 'pkill|killall' && no "name-based kill (pkill/killall); stop must be port-based"
+    if G | grep -q '^stop:'; then G | recipe stop - | grep -qE -e 'fuser \$\(PORT\)/tcp' -e 'for p in \$\(PORTS\); do if fuser \$\$p/tcp' -e '^	(bash|sh) \./[^ ]+ (stop|down)$' \
         || no "stop is neither fuser \$(PORT)/tcp (or a \$(PORTS) loop) nor the run script's stop/down"; fi
-    recipe clear "$f" | sed -e "s/-name [^ ]* -prune//g" -e "s/-path [^ ]* -prune//g" \
+    G | recipe clear - | sed -e "s/-name [^ ]* -prune//g" -e "s/-path [^ ]* -prune//g" \
         | grep -qE '\.env|node_modules|\.venv|\.git|(^|[/[:space:]])data(/|[[:space:]]|$)' \
         && no "clear touches .env*/node_modules/.venv/.git/data"
-    _ph=$(sed -n 's/^\.PHONY:[[:space:]]*//p' "$f" | tr ' ' '\n' | grep . | sort)
-    _dc=$(grep -E '^[a-zA-Z0-9_-]+:.*## ' "$f" | cut -d: -f1 | sort)
+    _ph=$(G | sed -n 's/^\.PHONY:[[:space:]]*//p' | tr ' ' '\n' | grep . | sort)
+    _dc=$(G | grep -E '^[a-zA-Z0-9_-]+:.*## ' | cut -d: -f1 | sort)
     [ -n "$_ph" ] && [ "$_ph" = "$_dc" ] || no ".PHONY and ## -documented targets differ"
     return "$bad"
 }
@@ -363,7 +434,7 @@ verify() { # <dir>: help lists every .PHONY target; make -n passes for each
     d=$1; bad=0
     command -v make >/dev/null 2>&1 || { echo "FAIL  make not on PATH"; return 1; }
     h=$(make --no-print-directory -C "$d" 2>&1) || { printf 'FAIL  make (help):\n%s\n' "$h"; return 1; }
-    for t in $(sed -n 's/^\.PHONY:[[:space:]]*//p' "$d/Makefile"); do
+    for t in $(gen_part "$d/Makefile" | sed -n 's/^\.PHONY:[[:space:]]*//p'); do
         printf '%s\n' "$h" | grep -qE "make +$t( |\$)" || { echo "FAIL  help does not list $t"; bad=1; }
         make --no-print-directory -C "$d" -n "$t" >/dev/null 2>&1 || { echo "FAIL  make -n $t"; bad=1; }
     done
@@ -390,6 +461,19 @@ main() {
     [ -n "$OPORT" ] && { PORT=$OPORT; PORTS=" $OPORT"; }
     [ -n "$LANG_" ] || LANG_=$DLANG
     render
+    # An existing Makefile's custom region survives a regeneration; one with
+    # no sentinel cannot, so name what --force would drop instead of taking
+    # it away quietly. The user moves those targets below the sentinel once.
+    KEEP=""
+    if [ -f "$p/Makefile" ]; then
+        if grep -qxF "$SENTINEL" "$p/Makefile"; then KEEP=$(keep_region "$p/Makefile")
+        else
+            for _t in $(grep -E '^[a-zA-Z0-9_-]+:' "$p/Makefile" | cut -d: -f1 | sort -u); do
+                has_t "$_t" && continue
+                WARNS="${WARNS}warn=custom target $_t not preserved (no sentinel; move it below the sentinel to keep it)$NL"
+            done
+        fi
+    fi
     if [ "$mode" = report ]; then
         [ "$ST" = no-stack ] && printf 'note=no stack detected; required targets are no-op placeholders\n'
         printf '%s%s' "$WARNS" "$REPORT"
@@ -402,7 +486,10 @@ self_test() {
     fail=0
     ok() { printf 'ok    %s\n' "$1"; }
     ko() { printf 'FAIL  %s\n' "$1"; fail=1; }
-    gen() { main "$@" > "$1/Makefile" && check "$1/Makefile" >/dev/null; }
+    # Render to a temp file, then move it in -- exactly Step 4 of SKILL.md.
+    # `main ... > <path>/Makefile` would truncate the file before main could
+    # read the custom region out of it.
+    gen() { main "$@" > "$1/.mk.tmp" && mv "$1/.mk.tmp" "$1/Makefile" && check "$1/Makefile" >/dev/null; }
     targets() { sed -n 's/^\.PHONY: //p' "$1/Makefile"; }
     hasmake=0; command -v make >/dev/null 2>&1 && hasmake=1
 
@@ -417,10 +504,18 @@ self_test() {
     [ "$(targets "$b")" = "help setup build run serve stop status logs test test-e2e test-all gen-api clear clean" ] \
         && ok "brokerdesk target set = PR #76" || ko "brokerdesk targets: $(targets "$b")"
     grep -q '^serve: ## ' "$b/Makefile" && grep -q '^run: build serve ## ' "$b/Makefile" \
-        && recipe serve "$b/Makefile" | grep -qF '@test -e frontend/dist ||' \
+        && recipe serve "$b/Makefile" | grep -qF '@test -e $(FRONTEND)/dist ||' \
         && grep -qF 'WEB_PORT=$(PORT) bash ./run-web.sh' "$b/Makefile" && grep -qF 'LOG  := /tmp/web-$(PORT).log' "$b/Makefile" \
         && recipe stop "$b/Makefile" | grep -qF 'fuser $(PORT)/tcp' \
         && ok "plain script -> run: build serve + guard, stop by port" || ko "brokerdesk run/serve/log mapping"
+    # frontend is named in five recipes, so it is a variable everywhere in
+    # them -- and nowhere in a ## description, which awk prints raw.
+    grep -qx 'FRONTEND := frontend' "$b/Makefile" \
+        && [ "$(recipe build "$b/Makefile")" = "${TAB}cd \$(FRONTEND) && bun run build:web" ] \
+        && ! grep -qE '^[a-z-]+:.*## .*frontend' "$b/Makefile" \
+        && ok "a repeated app dir becomes a variable, recipes only" || ko "FRONTEND var: $(cat "$b/Makefile")"
+    recipe serve "$b/Makefile" | grep -qxF "${TAB}@echo \"  -> http://localhost:\$(PORT)/\"" \
+        && ok "serve prints the URL it just started" || ko "serve URL: $(recipe serve "$b/Makefile")"
 
     # stock-steward shape: JS frontend + uv/mise backend, dev script with down)
     k=$tmp/ss; mkdir -p "$k/frontend" "$k/backend" "$k/scripts"
@@ -430,20 +525,20 @@ self_test() {
     printf '[tasks.install]\nrun="uv sync"\n[tasks.test]\nrun="x"\n[tasks.lint]\nrun="x"\n' > "$k/backend/mise.toml"
     printf '#!/usr/bin/env bash\ncase "$1" in\n  down) exit 0 ;;\nesac\nnpm run dev\n' > "$k/scripts/dev.sh"
     gen "$k" && ok "stock-steward shape passes --check" || ko "stock-steward --check"
-    [ "$(recipe setup "$k/Makefile")" = "${TAB}cd frontend && npm install${NL}${TAB}cd backend && mise run install" ] \
-        && [ "$(recipe test "$k/Makefile")" = "${TAB}cd frontend && npm run test${NL}${TAB}cd backend && mise run test" ] \
-        && [ "$(recipe lint "$k/Makefile")" = "${TAB}cd frontend && npm run lint${NL}${TAB}cd backend && mise run lint" ] \
-        && [ "$(recipe fmt "$k/Makefile")" = "${TAB}cd frontend && npm run fmt${NL}${TAB}cd backend && uv run ruff format ." ] \
+    [ "$(recipe setup "$k/Makefile")" = "${TAB}cd \$(FRONTEND) && npm install${NL}${TAB}cd \$(BACKEND) && mise run install" ] \
+        && [ "$(recipe test "$k/Makefile")" = "${TAB}cd \$(FRONTEND) && npm run test${NL}${TAB}cd \$(BACKEND) && mise run test" ] \
+        && [ "$(recipe lint "$k/Makefile")" = "${TAB}cd \$(FRONTEND) && npm run lint${NL}${TAB}cd \$(BACKEND) && mise run lint" ] \
+        && [ "$(recipe fmt "$k/Makefile")" = "${TAB}cd \$(FRONTEND) && npm run fmt${NL}${TAB}cd \$(BACKEND) && uv run ruff format ." ] \
         && ok "sub-app: mise task > uv tool, aggregated with JS" || ko "sub-app mapping: $(cat "$k/Makefile")"
     grep -q '^run: ## ' "$k/Makefile" && ! grep -q '^serve:' "$k/Makefile" \
         && recipe run "$k/Makefile" | grep -qx "${TAB}bash ./scripts/dev.sh" \
         && recipe stop "$k/Makefile" | grep -qx "${TAB}bash ./scripts/dev.sh down" \
         && main "$k" --report | grep -qxF "target=stop${TAB}source=scripts/dev.sh down" \
         && main "$k" --report | grep -qF "skip=serve${TAB}reason=run script starts a dev server (run dev)" \
-        && recipe clear "$k/Makefile" | grep -qF 'backend/.pytest_cache' \
+        && recipe clear "$k/Makefile" | grep -qF '$(BACKEND)/.pytest_cache' \
         && ok "dev-server script: run direct, stop -> script down" || ko "dev-script run/stop: $(cat "$k/Makefile")"
-    rm "$k/backend/mise.toml"; gen "$k" && recipe setup "$k/Makefile" | grep -qx "${TAB}cd backend && uv sync" \
-        && recipe test "$k/Makefile" | grep -qx "${TAB}cd backend && uv run pytest" \
+    rm "$k/backend/mise.toml"; gen "$k" && recipe setup "$k/Makefile" | grep -qx "${TAB}cd \$(BACKEND) && uv sync" \
+        && recipe test "$k/Makefile" | grep -qx "${TAB}cd \$(BACKEND) && uv run pytest" \
         && ok "sub-app without mise -> uv sync / uv run pytest" || ko "sub-app uv fallback"
 
     # agent-toolbox shape: root bun workspace, uv app under apps/, scripts/setup.sh
@@ -458,11 +553,12 @@ self_test() {
     [ "$(recipe setup "$t/Makefile")" = "${TAB}bash ./scripts/setup.sh" ] \
         && main "$t" --report | grep -qxF "target=setup${TAB}source=scripts/setup.sh" \
         && ok "setup delegates to scripts/setup.sh" || ko "setup delegation: $(recipe setup "$t/Makefile")"
-    [ "$(recipe test "$t/Makefile")" = "${TAB}cd apps/server && uv run pytest" ] \
-        && [ "$(recipe lint "$t/Makefile")" = "${TAB}bun run lint${NL}${TAB}cd apps/server && uv run ruff check ." ] \
-        && [ "$(recipe fmt "$t/Makefile")" = "${TAB}bun run format${NL}${TAB}cd apps/server && uv run ruff format ." ] \
+    [ "$(recipe test "$t/Makefile")" = "${TAB}cd \$(SERVER) && uv run pytest" ] \
+        && [ "$(recipe lint "$t/Makefile")" = "${TAB}bun run lint${NL}${TAB}cd \$(SERVER) && uv run ruff check ." ] \
+        && [ "$(recipe fmt "$t/Makefile")" = "${TAB}bun run format${NL}${TAB}cd \$(SERVER) && uv run ruff format ." ] \
+        && grep -qx 'SERVER := apps/server' "$t/Makefile" \
         && ok "sub-app under apps/ joins test/lint/fmt" || ko "nested sub-app: $(cat "$t/Makefile")"
-    [ "$(recipe clear "$t/Makefile")" = "${TAB}rm -rf dist apps/server/dist apps/server/.pytest_cache" ] \
+    [ "$(recipe clear "$t/Makefile")" = "${TAB}rm -rf dist \$(SERVER)/dist \$(SERVER)/.pytest_cache" ] \
         && ok "clear lists each artifact once" || ko "clear: $(recipe clear "$t/Makefile")"
 
     # quantfolio shape: uv root + nested vite app, two-server script, tools/dev.sh
@@ -477,16 +573,17 @@ self_test() {
         && recipe stop "$q/Makefile" | grep -qF 'for p in $(PORTS); do if fuser $$p/tcp' \
         && recipe status "$q/Makefile" | grep -qF 'for p in $(PORTS); do' \
         && ok "multi-server script -> stop/status over every port" || ko "multi-port: $(cat "$q/Makefile")"
-    [ "$(recipe build "$q/Makefile")" = "${TAB}cd src/frontend && npm run build" ] \
-        && recipe status "$q/Makefile" | grep -qF '@test -e src/frontend/dist &&' \
+    [ "$(recipe build "$q/Makefile")" = "${TAB}cd \$(FRONTEND) && npm run build" ] \
+        && grep -qx 'FRONTEND := src/frontend' "$q/Makefile" \
+        && recipe status "$q/Makefile" | grep -qF '@test -e $(FRONTEND)/dist &&' \
         && ! recipe status "$q/Makefile" | grep -qF 'test -e build ' \
         && ok "nested JS build delegated, status checks its output" || ko "nested build: $(cat "$q/Makefile")"
     main "$q" --report | grep -qxF "target=setup${TAB}source=uv.lock + src/frontend/package.json" \
-        && [ "$(recipe setup "$q/Makefile")" = "${TAB}uv sync${NL}${TAB}cd src/frontend && npm install" ] \
+        && [ "$(recipe setup "$q/Makefile")" = "${TAB}uv sync${NL}${TAB}cd \$(FRONTEND) && npm install" ] \
         && ok "setup source names uv.lock" || ko "setup source: $(main "$q" --report | grep setup)"
-    [ "$(recipe test "$q/Makefile")" = "${TAB}bash ./tools/dev.sh test${NL}${TAB}cd src/frontend && npm run test" ] \
+    [ "$(recipe test "$q/Makefile")" = "${TAB}bash ./tools/dev.sh test${NL}${TAB}cd \$(FRONTEND) && npm run test" ] \
         && [ "$(recipe fmt "$q/Makefile")" = "${TAB}bash ./tools/dev.sh fmt" ] \
-        && [ "$(recipe lint "$q/Makefile")" = "${TAB}cd src/frontend && npm run lint${NL}${TAB}uv run ruff check ." ] \
+        && [ "$(recipe lint "$q/Makefile")" = "${TAB}cd \$(FRONTEND) && npm run lint${NL}${TAB}uv run ruff check ." ] \
         && main "$q" --report | grep -qxF "target=test${TAB}source=tools/dev.sh test, src/frontend/package.json scripts.test" \
         && ok "script test)/fmt) arm replaces the direct command" || ko "script subcommands: $(cat "$q/Makefile")"
     gen "$q" --port 9000 && grep -qx 'PORT ?= 9000' "$q/Makefile" && ! grep -q '^PORTS' "$q/Makefile" \
@@ -496,6 +593,42 @@ self_test() {
     m=$tmp/mise; mkdir -p "$m"; printf '[tasks.build]\nrun="x"\n[tasks.test]\nrun="y"\n[tasks.fix]\nrun="z"\n' > "$m/mise.toml"
     gen "$m" && recipe build "$m/Makefile" | grep -qx "${TAB}mise run build" && recipe test "$m/Makefile" | grep -qx "${TAB}mise run test" \
         && recipe fix "$m/Makefile" | grep -qx "${TAB}mise run fix" && ok "mise tasks -> mise run" || ko "mise delegation"
+
+    # brokerdesk's mise.toml: lint + fmt-check is the pair CI runs, so `make
+    # lint` must run both -- a lint that is green on code CI rejects is the
+    # bug -- and fmt-check must not also land as a target of its own.
+    l=$tmp/lint; mkdir -p "$l"
+    printf '[tasks.lint]\nrun="ruff check ."\n[tasks.fmt-check]\nrun="ruff format --check ."\n[tasks.fmt]\nrun="ruff format ."\n' > "$l/mise.toml"
+    gen "$l" && [ "$(recipe lint "$l/Makefile")" = "${TAB}mise run lint${NL}${TAB}mise run fmt-check" ] \
+        && ! grep -q '^fmt-check:' "$l/Makefile" \
+        && main "$l" --report | grep -qxF "target=lint${TAB}source=mise.toml [tasks.lint] + [tasks.fmt-check]" \
+        && ok "lint keeps CI parity with fmt-check" || ko "lint/fmt-check: $(cat "$l/Makefile")"
+
+    # The custom region: copied verbatim across a regeneration, never parsed.
+    # Without the sentinel nothing can be kept, so --force must name what it
+    # would drop rather than taking it away quietly.
+    c=$tmp/keep; mkdir -p "$c"; printf '[tasks.build]\nrun="x"\n' > "$c/mise.toml"
+    gen "$c" && cp "$c/Makefile" "$c/Makefile.gen"
+    printf '%s\n%s\n' "backup-db: ## back up the db" "${TAB}pg_dump mine > out.sql" >> "$c/Makefile"
+    gen "$c" && recipe backup-db "$c/Makefile" | grep -qx "${TAB}pg_dump mine > out.sql" \
+        && grep -qx 'backup-db: ## back up the db' "$c/Makefile" \
+        && ! main "$c" --report | grep -q '^warn=custom target' \
+        && ok "the region below the sentinel survives a regeneration" || ko "sentinel keep: $(cat "$c/Makefile")"
+    check "$c/Makefile" >/dev/null \
+        && ok "--check ignores the custom region (not in .PHONY, not its rules)" || ko "check over a kept region"
+    cp "$c/Makefile" "$c/Makefile.1"; gen "$c" \
+        && diff -q "$c/Makefile.1" "$c/Makefile" >/dev/null \
+        && [ "$(grep -c '^# --- custom' "$c/Makefile")" = 1 ] \
+        && ok "regenerating over a kept region is idempotent" || ko "sentinel idempotency: $(cat "$c/Makefile")"
+    printf 'backups: ## list backups\n%sls -1 b/\n' "$TAB" > "$c/Makefile"
+    main "$c" --report | grep -qxF 'warn=custom target backups not preserved (no sentinel; move it below the sentinel to keep it)' \
+        && ok "a sentinel-less Makefile reports each target --force would drop" || ko "no-sentinel warn: $(main "$c" --report)"
+    main "$c" --report | grep -q '^warn=custom target build ' && ko "warn names a regenerated target" \
+        || ok "only targets absent from the new Makefile are warned about"
+    check "$c/Makefile.gen" >/dev/null || ko "check rejects a generated Makefile"
+    sed '/^# --- custom/d' "$c/Makefile.gen" > "$c/Makefile.nosent"
+    check "$c/Makefile.nosent" >/dev/null && ko "check accepts a Makefile with no sentinel" \
+        || ok "check rejects a Makefile that lost its sentinel"
 
     # no stack: required four exist, build is an exit-0 no-op
     e=$tmp/empty; mkdir -p "$e"
@@ -507,7 +640,7 @@ self_test() {
     gen "$a" && grep -q '^build: build-x build-y ## ' "$a/Makefile" && ok "apps/* -> build-x build-y" || ko "multi-app build"
 
     # --check must reject contract violations
-    bad() { printf '%s\n' "$2" > "$tmp/bad.mk"; check "$tmp/bad.mk" >/dev/null && ko "check accepts: $1" || ok "check rejects: $1"; }
+    bad() { printf '%s\n%s\n' "$2" "$SENTINEL" > "$tmp/bad.mk"; check "$tmp/bad.mk" >/dev/null && ko "check accepts: $1" || ok "check rejects: $1"; }
     H=".DEFAULT_GOAL := help${NL}.PHONY: help clear stop${NL}help: ## h${NL}${TAB}@awk '/^[a-zA-Z0-9_-]+:.*## /' x${NL}stop: ## s${NL}${TAB}fuser \$(PORT)/tcp"
     bad "clear deletes .env" "$H${NL}clear: ## c${NL}${TAB}rm -rf dist .env"
     bad "clear deletes web/data" "$H${NL}clear: ## c${NL}${TAB}rm -rf web/data"
@@ -522,6 +655,10 @@ self_test() {
     if [ "$hasmake" -eq 1 ]; then
         gen "$q"
         for d in "$b" "$m" "$e" "$a" "$k" "$q" "$t"; do verify "$d" >/dev/null && ok "verify $(basename "$d")" || ko "verify $d: $(verify "$d")"; done
+        # A preserved target may call tooling the skill knows nothing about,
+        # so --verify covers the generated .PHONY set and stops there.
+        gen "$c"; printf '%s\n%s\n' "deploy: ## ship it" "${TAB}definitely-not-a-command" >> "$c/Makefile"
+        verify "$c" >/dev/null && ok "--verify skips make -n on preserved targets" || ko "verify over a kept region: $(verify "$c")"
         o=$(make --no-print-directory -C "$e" build 2>&1) && [ "$o" = "no build step" ] && ok "no-stack make build -> exit 0" || ko "no-stack build: $o"
     else printf 'skip  make not on PATH -- verify cases not run\n'; fi
 

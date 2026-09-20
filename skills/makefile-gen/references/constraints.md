@@ -12,6 +12,14 @@
   `cp Makefile Makefile.bak`) or left alone (`--apply` alone refuses).
   Merging hand-written rules the skill does not understand breaks them
   silently.
+- **The sentinel region is copied, never merged.** The generated text ends
+  with `# --- custom (kept by makefile-gen) ---`; whatever an existing
+  Makefile has below that line is carried over byte for byte. The skill
+  never reads, validates or rewrites it, and `--check` / `--verify` stop at
+  the sentinel. A Makefile with no sentinel gets no preservation, and the
+  report names every target `--force` would drop. Render into a temp file
+  and move it in: `render.sh <path> > <path>/Makefile` truncates the file
+  before the region can be read out of it.
 - **Secrets and data are out of reach.** `clear` deletes only allowlisted
   names that a `.gitignore` also covers (`references/detection.md`). The
   allowlist has no entry that could match `.env*`, credential files,
@@ -23,8 +31,10 @@
   scheduler inherits `WEB_PORT` from the web server, so a name-based stop
   killed running strategies.
 - **Verification has no side effects.** `--verify` runs `make` (help only)
-  and `make -n <target>`. It never really runs `run`, `serve`, `stop`,
-  `build` or `clear`.
+  and `make -n <target>` over the generated `.PHONY` set. It never really
+  runs `run`, `serve`, `stop`, `build` or `clear`, and it never `make -n`s a
+  preserved target — that recipe is the user's and may call tooling the
+  skill knows nothing about.
 
 ## Failure handling
 

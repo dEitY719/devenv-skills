@@ -28,6 +28,8 @@ clear: ## Remove build/test artifacts (keeps dependencies, secrets, data)
 	rm -rf <allowlisted artifacts>
 
 clean: clear ## Same as clear
+
+# --- custom (kept by makefile-gen) ---
 ```
 
 The variable block is emitted only as needed: `PORT` with a server port
@@ -61,9 +63,16 @@ value.
   rejected anywhere in the file.
 - **`clear` never names `.env*`, `node_modules`, `.venv`, `.git` or a
   `data` dir** outside a `-prune` clause.
+- **The custom sentinel is the last generated line.** Without it a
+  regeneration has nothing to preserve. Every rule above is checked over the
+  generated region only; what a user keeps below the sentinel is not the
+  skill's to judge (`references/target-catalog.md`).
 
 ## Variables
 
 User-overridable values use `?=` (`PORT=9000 make run`). Derived values use
-`:=`. Sub-app paths are written literally rather than through a variable —
-one fewer indirection, and the report names the source file anyway.
+`:=`. A sub-app path named three or more times across the recipes gets its
+own `:=` variable (`FRONTEND := frontend`) so that renaming the app is a
+one-line edit; one named once or twice stays literal, and a `##` description
+always does. Rules and name collisions:
+`references/target-catalog.md`.

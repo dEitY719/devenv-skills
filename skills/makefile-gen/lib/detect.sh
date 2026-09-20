@@ -22,8 +22,10 @@
 #   script_sub=<rel>|<bash|sh>|<test|lint|fmt>  (repeat) case arm in one of
 #                                   those scripts or tools/dev.sh; first wins
 #   script_setup=<rel>|<bash|sh>    scripts/setup.sh, else setup.sh
-#   port=<n>                        (repeat) every port in the first server
-#                                   script, then vite.config server.port
+#   port=<n>                        (repeat) every port in the code half of
+#                                   the first server script -- comments are
+#                                   stripped -- with the ${NAME:-n} default
+#                                   first, then vite.config server.port
 #   port_var=<NAME>  log=<path>     from the first server script
 #   script_stop=<stop|down>         first script has that case arm (teardown)
 #   devserver=<signal>              first script starts a dev server (vite, ...)
@@ -40,7 +42,7 @@ set -u
 ALLOW='dist build out coverage .pytest_cache __pycache__ test-results playwright-report target .next .turbo'
 
 usage() {
-    sed -n '2,34p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 # ignored <root> <rel>: is <rel> matched by <root>/.gitignore or by the
@@ -80,6 +82,27 @@ mise_tasks() {
         [ -f "$_m" ] && sed -n 's/^\[tasks\.\"\{0,1\}\([A-Za-z0-9_:-]*\)\"\{0,1\}\][[:space:]]*$/\1/p' "$_m"
     done
 }
+# uncomment <file>: the script's code half -- from the first `#` that starts
+# a word outside quotes to end of line is dropped, the line itself is kept.
+# A usage header (`#   WEB_PORT=9000 ./run-web.sh`) must not look like code,
+# while `--port 8080  # default` keeps the half that is. `#` only counts at a
+# word start, which is also sh's own rule and leaves `${s#*/}` alone.
+# ponytail: no backslash or here-doc tracking; quotes are per-line.
+uncomment() {
+    awk '{
+        _q = ""; _o = $0
+        for (_i = 1; _i <= length($0); _i++) {
+            _c = substr($0, _i, 1)
+            if (_q != "") { if (_c == _q) _q = ""; continue }
+            if (_c == "\"" || _c == "'"'"'") { _q = _c; continue }
+            if (_c == "#" && (_i == 1 || substr($0, _i - 1, 1) ~ /[ \t]/)) {
+                _o = substr($0, 1, _i - 1); break
+            }
+        }
+        print _o
+    }' "$1"
+}
+
 # has_arm <script> <name>: a `name)` case arm (also `a|name)`, quoted).
 has_arm() { grep -qE "^[[:space:]]*\(?([^)]*\|)?[\"']?$2[\"']?(\|[^)]*)?\)" "$1"; }
 has_pytest() { [ -f "$1/pytest.ini" ] || [ -f "$1/conftest.py" ] || py_mentions "$1" 'pytest'; }
@@ -115,6 +138,19 @@ runner_of() { # <dir> <label>: sets RUNNER (not echoed -- WARNS must survive)
     RUNNER=${_r:-npm}
 }
 
+# ws_skip <rel> <kind>: true when <rel> holds whitespace. Every app dir list
+# below is one space-separated string that later loops split on, and Make
+# cannot name such a path in a target or a recipe either, so the scan drops
+# the dir with a warn rather than quietly emitting half a directory name.
+ws_skip() {
+    case $1 in *[[:space:]]*)
+        WARNS="${WARNS}warn=$2 dir skipped, whitespace in path: $1
+"
+        return 0 ;;
+    esac
+    return 1
+}
+
 detect() {
     root=${1%/}; [ -n "$root" ] || root=/
     if [ ! -d "$root" ]; then
@@ -142,6 +178,7 @@ detect() {
     else jsdirs=""; for d in "$root"/*/ "$root"/apps/*/ "$root"/src/*/; do
         d=${d%/}; case "$d" in */node_modules) continue ;; esac
         [ -f "$d/package.json" ] || continue
+        ws_skip "${d#"$root"/}" app && continue
         case " $jsdirs " in *" ${d#"$root"/} "*) ;; *) jsdirs="$jsdirs ${d#"$root"/}" ;; esac
     done; fi
     for d in $jsdirs; do
@@ -167,6 +204,7 @@ detect() {
         # A root Python project owns the env instead.
         for d in "$root"/*/ "$root"/apps/*/ "$root"/src/*/; do
             d=${d%/}; n=${d#"$root"/}
+            ws_skip "$n" sub-app && continue
             case " $jsdirs $subdirs " in *" $n "*) continue ;; esac
             sp=$(py_kind "$d"); mt=$(mise_tasks "$d" | paste -sd, -)
             [ -n "$sp$mt" ] || continue
@@ -201,11 +239,21 @@ detect() {
     ports=""
     if [ -n "$first" ]; then
         # Every port the script names: one run script may start several servers.
-        ports=$(grep -oE '\$\{[A-Z_]*PORT:-[0-9]+\}|[A-Z_]*PORT=[0-9]+|--port[= ][0-9]+' "$first" | grep -oE '[0-9]+')
-        pv=$(sed -n 's/.*\${\([A-Z_]*PORT\):-[0-9][0-9]*}.*/\1/p' "$first" | head -n1)
-        [ -n "$pv" ] && add "port_var=$pv"
-        lg=$(sed -n 's/.*LOG:-\([^"'"'"' ]*\.log\).*/\1/p' "$first" | head -n1)
-        [ -n "$lg" ] || lg=$(sed -n 's/.*>[[:space:]]*\(\/[^"'"'"' ]*\.log\).*/\1/p' "$first" | head -n1)
+        # Read the code half only: a usage header that documents an override
+        # (`WEB_PORT=9000 ./run-web.sh`) is prose, not the script's default.
+        code=$(uncomment "$first")
+        ports=$(printf '%s\n' "$code" | grep -oE '\$\{[A-Z_]*PORT:-[0-9]+\}|[A-Z_]*PORT=[0-9]+|--port[= ][0-9]+' | grep -oE '[0-9]+')
+        pv=$(printf '%s\n' "$code" | sed -n 's/.*\${\([A-Z_]*PORT\):-[0-9][0-9]*}.*/\1/p' | head -n1)
+        if [ -n "$pv" ]; then
+            add "port_var=$pv"
+            # That expansion is the script's own default, so it heads the list
+            # and wins `PORT ?=` whatever the file order -- a bare `VAR=n`
+            # further up is one caller's choice, not the default.
+            ports="$(printf '%s\n' "$code" | sed -n "s/.*\${$pv:-\([0-9][0-9]*\)}.*/\1/p" | head -n1)
+$ports"
+        fi
+        lg=$(printf '%s\n' "$code" | sed -n 's/.*LOG:-\([^"'"'"' ]*\.log\).*/\1/p' | head -n1)
+        [ -n "$lg" ] || lg=$(printf '%s\n' "$code" | sed -n 's/.*>[[:space:]]*\(\/[^"'"'"' ]*\.log\).*/\1/p' | head -n1)
         [ -n "$lg" ] && add "log=$lg"
         # A dev server builds/serves for itself, so run must not depend on build.
         # ponytail: word-match heuristic (comments count); extend the list as needed.
@@ -299,6 +347,40 @@ EOF
         artifact=__pycache__ artifact=.pytest_cache artifact=frontend/dist \
         artifact=frontend/test-results artifact=frontend/playwright-report
     deny "clear never sees .env/node_modules/.venv/data" "$b" '^artifact=.*(\.env|node_modules|\.venv|data)'
+
+    # A usage header that documents an override is prose: `WEB_PORT=9000` in a
+    # comment must not become the project's port, and must not turn a
+    # single-server project into the multi-port `for p in $(PORTS)` shape.
+    cat > "$b/run-web.sh" <<'EOF'
+#!/usr/bin/env bash
+#   WEB_PORT=9000 ./run-web.sh   # port override
+PORT="${WEB_PORT:-8888}"
+LOG="${WEB_LOG:-/tmp/web-${PORT}.log}"
+EOF
+    want "commented usage line is not a port" "$b" port=8888 port_var=WEB_PORT
+    deny "commented usage line is not a port (9000 absent)" "$b" '^port=9000$'
+    [ "$(detect "$b" | grep -c '^port=')" = 1 ] && printf 'ok    one port -> no PORTS shape\n' \
+        || { printf 'FAIL  commented port leaked a second port\n'; fail=1; }
+
+    # The code half of a line survives: only the comment is cut.
+    printf '#!/bin/sh\nexec uvicorn app:app --port 8080  # default\n' > "$b/run-web.sh"
+    want "an inline comment keeps the code half of its line" "$b" port=8080
+
+    # File order does not decide: the ${VAR:-n} expansion is the script's own
+    # default, so it wins `PORT ?=` over a bare assignment further up.
+    printf '#!/bin/sh\nAPI_PORT=7001\nPORT="${WEB_PORT:-8888}"\n' > "$b/run-web.sh"
+    want "the \${VAR:-n} default heads the port list" "$b" port_var=WEB_PORT
+    [ "$(detect "$b" | sed -n 's/^port=//p' | head -n1)" = 8888 ] \
+        && printf 'ok    the ${VAR:-n} default wins PORT regardless of file order\n' \
+        || { printf 'FAIL  first port is %s, want 8888\n' "$(detect "$b" | sed -n 's/^port=//p' | head -n1)"; fail=1; }
+    printf '#!/usr/bin/env bash\nPORT="${WEB_PORT:-8888}"\nLOG="${WEB_LOG:-/tmp/web-${PORT}.log}"\n' > "$b/run-web.sh"
+
+    # Whitespace in an app dir: every dir list here is one space-separated
+    # string, and no Make recipe could name the dir either.
+    mkdir -p "$tmp/ws/my app"; printf '{"scripts":{"build":"x"}}\n' > "$tmp/ws/my app/package.json"
+    want "app dir with whitespace is skipped, with a warn" "$tmp/ws" \
+        'warn=app dir skipped, whitespace in path: my app'
+    deny "no half-a-directory js fact" "$tmp/ws" '^js=my$|^js=app'
 
     m=$tmp/mise; mkdir -p "$m"
     printf '[tools]\npython = "3.12"\n\n[tasks.build]\nrun = "x"\n\n[tasks."test"]\nrun = "y"\n' > "$m/mise.toml"
