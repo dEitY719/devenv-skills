@@ -1,6 +1,6 @@
 {
   "name": "devenv",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "One-time machine and toolchain setup: mise + uv migration, Makefile generation, dotfiles symlink management, audited SSH key delegation.",
   "author": {
     "name": "dEitY719",
