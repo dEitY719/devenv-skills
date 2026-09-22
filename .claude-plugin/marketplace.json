@@ -10,7 +10,7 @@
     {
       "name": "devenv",
       "description": "Set up a machine and its toolchain once: migrate a legacy Python venv project to mise + uv, generate a stack-aware Makefile, manage dotfiles config files as symlinks, and delegate SSH keys to hosts through an audited manifest",
-      "version": "0.2.4",
+      "version": "0.2.5",
       "homepage": "https://github.com/dEitY719/devenv-skills",
       "source": "./",
       "author": {
