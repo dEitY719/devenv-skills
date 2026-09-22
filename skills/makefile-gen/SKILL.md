@@ -5,6 +5,8 @@ description: >-
   Use for /devenv:makefile-gen, /devenv-makefile-gen, "이 프로젝트에 Makefile
   만들어줘", "generate a Makefile for this project". Dry-run unless --apply.
 allowed-tools: Bash, Read, Write
+compatibility:
+  network: none  # the only http:// in lib/ is the serve target's printed URL
 license: MIT
 metadata:
   model_recommendation:
@@ -47,13 +49,12 @@ become no-op placeholders. Key meanings and the signal matrix:
 Makefile; the same call with `--report` prints one `target=<t> source=<file>`
 line per generated target, one `skip=<t> reason=<why>` per omitted optional
 target, and any `warn=` (e.g. lockfile conflict). The mapping rules — which
-source wins per target, when `run` depends on `build`, when `serve` / `stop`
-/ `status` / `logs` exist — are in `references/target-catalog.md`; the
-skeleton conventions (GNU Make 3.81, `##` help, `.PHONY`) in
-`references/template.md`. Do not hand-edit the rendered text; if a mapping
-is wrong, say so in the report instead of patching it silently.
-
-Help language: `--lang` wins, else `lang=` from detect (README Hangul → ko).
+source wins per target, when `run` depends on `build`, when `serve` / `stop` /
+`status` / `logs` exist — are in `references/target-catalog.md`; the skeleton
+conventions (GNU Make 3.81, `##` help, `.PHONY`) in `references/template.md`.
+Do not hand-edit the rendered text; if a mapping is wrong, say so in the report
+instead of patching it silently. Help language: `--lang` wins, else `lang=`
+from detect (README Hangul → ko).
 
 ## Step 3: Dry-Run Report (default)
 
