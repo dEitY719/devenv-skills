@@ -1,8 +1,8 @@
 # devenv — skill index
 
-Four skills for one-time machine and toolchain setup. Each lives in this
+Five skills for one-time machine and toolchain setup. Each lives in this
 extension's `skills/` directory. They are task-triggered: load the one that
-matches the job by reading its `SKILL.md`, then follow it. Do not load all four.
+matches the job by reading its `SKILL.md`, then follow it. Do not load all five.
 
 | Skill | Read | Use when |
 |-------|------|----------|
@@ -10,6 +10,7 @@ matches the job by reading its `SKILL.md`, then follow it. Do not load all four.
 | `makefile-gen` | `@./skills/makefile-gen/SKILL.md` | Generating a stack-aware `Makefile` (`help`/`build`/`run`/`clear` + detected extras) that delegates to existing mise tasks, `package.json` scripts or run scripts. |
 | `symlink-manager` | `@./skills/symlink-manager/SKILL.md` | Moving a config file into the dotfiles repo and linking it back from its original path, with management functions and a commit. |
 | `ssh-delegate` | `@./skills/ssh-delegate/SKILL.md` | Standardising SSH key delegation through `~/.ssh/delegations.yml` instead of ad-hoc `ssh-copy-id` — add, list, test, sync, revoke, doctor. |
+| `runner-setup` | `@./skills/runner-setup/SKILL.md` | Registering a Docker-container self-hosted GitHub Actions runner for a GHES or GitHub.com repo and moving its workflows onto it. |
 
 Each skill's `references/` directory holds the detail it loads on demand;
 `SKILL.md` says which file to read and when. Do not read `references/` files up
@@ -63,7 +64,7 @@ instead — `agy` shares `~/.gemini` but not Gemini CLI's tool names.
   `.backup`, create the link, and verify it. Any phase failure aborts the run
   and reports `[FAIL]`; a Phase 1 failure restores from the backup. Announce the
   plan before the first change.
-- `ssh-delegate` is the most destructive of the four: it installs and removes
+- `ssh-delegate` is the most destructive of the five: it installs and removes
   public keys on remote hosts. Three rules are absolute — the manifest and ssh
   config drop-in are written mode 0600, a host-fingerprint MISMATCH reported by
   `sync` is an ALERT that stops the run (re-trusting a changed host key is a
@@ -71,3 +72,7 @@ instead — `agy` shares `~/.gemini` but not Gemini CLI's tool names.
   audit log. Use `add --dry-run` first when the user is unsure. `revoke` marks
   the manifest entry `revoked: true` and keeps the row for audit history; it
   never deletes it.
+- `runner-setup` registers a runner container on a remote host over SSH on
+  every run; only the workflow rewrite waits for `--apply`. It refuses an
+  existing `<repo>-runner` container (exit 3) — relay the hint, never remove
+  the container yourself — and never echoes the registration token.

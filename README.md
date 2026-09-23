@@ -1,10 +1,10 @@
 # devenv-skills
 
-Four skills for the one-time work of setting a machine and its toolchain up —
+Five skills for the one-time work of setting a machine and its toolchain up —
 migrate a legacy Python venv project onto mise + uv, generate a stack-aware
 Makefile, move a config file into
 dotfiles and link it back, replace ad-hoc `ssh-copy-id` with an audited key
-manifest. Packaged as a single plugin named `devenv`, installable on six
+manifest, register a self-hosted GitHub Actions runner. Packaged as a single plugin named `devenv`, installable on six
 coding-agent harnesses.
 
 ## Skills
@@ -15,8 +15,9 @@ coding-agent harnesses.
 | `makefile-gen` | `/devenv:makefile-gen [path] [--apply] [--force]` | Detects the project's stack and generates a `Makefile`: `help` (default, built from `##` comments), `build`, `run`, `clear` always; `setup`, `serve`, `stop`, `status`, `logs`, `test*`, `lint`, `fmt`, `gen-*` only when detected. Recipes delegate to mise tasks, `package.json` scripts or run scripts. Dry-run unless `--apply`. |
 | `symlink-manager` | `/devenv:symlink-manager <file>` | Moves a config file into the dotfiles repo, links it back from its original path with a `.backup` of the original, generates `<app>_init` / `<app>_edit_*` helpers, updates help, and commits. |
 | `ssh-delegate` | `/devenv:ssh-delegate <sync\|add\|list\|test\|revoke\|doctor>` | Manages SSH key delegation through `~/.ssh/delegations.yml` (mode 0600) instead of one-shot `ssh-copy-id` — identity pinning, host-fingerprint pinning, and a `flock`-serialized JSONL audit log. |
+| `runner-setup` | `/devenv:runner-setup [--env internal\|public] [--repo o/n] [--label l] [--host h] [--apply]` | Starts a Docker-container self-hosted GitHub Actions runner on an SSH host, registers it to the repo (GHES by default, or GitHub.com) and verifies it online; then rewrites `.github/workflows` onto it (`runs-on`, and on GHES the mise install step and `UV_NATIVE_TLS`). Workflow edits dry-run unless `--apply`. |
 
-All four write. None of them is a read-only auditor — see
+All five write. None of them is a read-only auditor — see
 [Harness support](#harness-support) and [`CLAUDE.md`](CLAUDE.md) for each
 skill's safety contract.
 
@@ -72,8 +73,8 @@ Antigravity (`agy`) shares `~/.gemini`, so it inherits the install.
 
 These skills are written in Claude Code's vocabulary, but none of them depends
 on a Claude-Code-only tool: `mise-migrate`, `makefile-gen` and
-`symlink-manager` need only read/write/shell, and `ssh-delegate` is a thin router over a POSIX-sh script in
-`skills/ssh-delegate/lib/`. What varies between harnesses is not the tool
+`symlink-manager` need only read/write/shell, and `ssh-delegate` and `runner-setup` are thin routers over POSIX-sh scripts in
+their `lib/`. What varies between harnesses is not the tool
 vocabulary but the *environment* each one runs in. Per-harness tool names are
 mapped in [`harness-skills/references/`](https://github.com/dEitY719/harness-skills/tree/main/references);
 read the one file for the harness you are on.
@@ -84,6 +85,7 @@ read the one file for the harness you are on.
 | `makefile-gen` | full | full | full | full | full | full |
 | `symlink-manager` | full | full | full | full | full | full |
 | `ssh-delegate` | full | needs a TTY for `add` | needs a TTY for `add` | needs a TTY for `add` | needs a TTY for `add` | needs a TTY for `add` |
+| `runner-setup` | full | full | full | full | full | full |
 
 *needs a TTY for `add`* — `ssh-copy-id` prompts once for the remote password and
 that prompt cannot be answered from a non-interactive session. `ssh_delegate.sh`
@@ -94,7 +96,8 @@ unattended. This applies to Claude Code's non-interactive `!` sessions too.
 Three environment dependencies apply everywhere: `mise-migrate --apply` runs
 `uv sync`, so `uv` must be on `PATH`; `symlink-manager` assumes a dotfiles repo
 laid out as `bash/{claude,app,config,env}/` and commits with `git`; `makefile-gen`'s
-generated `stop`/`status` targets use `fuser` (Linux psmisc).
+generated `stop`/`status` targets use `fuser` (Linux psmisc); `runner-setup` needs
+`gh` (authenticated to the target host) and an SSH alias whose user can run `docker`.
 
 ## Layout
 
@@ -102,7 +105,7 @@ Manifests live at the repo root and all point at one flat `skills/` directory:
 
 ```
 .
-├── skills/{mise-migrate,makefile-gen,symlink-manager,ssh-delegate}/
+├── skills/{mise-migrate,makefile-gen,symlink-manager,ssh-delegate,runner-setup}/
 │   ├── SKILL.md
 │   ├── references/
 │   └── lib/                                   helper scripts (POSIX sh)

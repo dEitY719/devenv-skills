@@ -7,7 +7,7 @@ text. Edit `CLAUDE.md`; never replace the symlink with a second copy.
 ## What this repo is
 
 A single-plugin skill marketplace. The plugin is named `devenv` and it bundles
-four skills for one-time machine and toolchain setup — the things you do once
+five skills for one-time machine and toolchain setup — the things you do once
 on a new box and then want reproducible:
 
 | Skill | Role |
@@ -16,13 +16,14 @@ on a new box and then want reproducible:
 | `makefile-gen` | Detect a project's stack and generate a `Makefile` (`help`/`build`/`run`/`clear` + detected extras) that delegates to existing mise tasks, `package.json` scripts or run scripts. Dry-run unless `--apply`. |
 | `symlink-manager` | Move a config file into the dotfiles repo, link it back, generate management functions, commit. |
 | `ssh-delegate` | Manage SSH key delegation through `~/.ssh/delegations.yml` instead of ad-hoc `ssh-copy-id`, with fingerprint pinning and an audit log. |
+| `runner-setup` | Register a Docker-container self-hosted GitHub Actions runner on an SSH host for a GHES (default) or GitHub.com repo, then move its workflows onto it. Workflow edits dry-run unless `--apply`. |
 
 Three of the skills were extracted from `dEitY719/dotfiles`
 (`claude/skills/devx-{mise-migrate,symlink-manager,ssh-delegate}`) as a snapshot
 — see the first commit for the source SHA. The dotfiles copies are gone: that
 tree was deleted in dotfiles Phase 4-1 (`ad0d33d5`), so this repo is now the
-only home for those three skills. `makefile-gen` was written here directly
-(issue #14) and has no dotfiles ancestor.
+only home for those three skills. `makefile-gen` (issue #14) and `runner-setup`
+(issue #28) were written here directly and have no dotfiles ancestor.
 
 ## Layout: root manifests, one flat `skills/`
 
@@ -68,13 +69,13 @@ at this repo's root, and adding one for tool mappings is a bug.
 - **Invocation form in prose is namespaced.** Body text referring to a skill as
   a command writes `/devenv:ssh-delegate` (or `/devenv-ssh-delegate`).
 - **Progressive disclosure.** `SKILL.md` stays under 100 lines (CI enforces it)
-  and names which `references/` file to read and when. All four are currently
+  and names which `references/` file to read and when. The four older ones are
   at 95-97 lines — there is almost no headroom, so an addition means an
   extraction. Detail lives in `references/`. Do not inline a reference file
   back into `SKILL.md`.
 - **Description budget.** CI sums every skill description and fails past 5,440
   characters — Codex's context budget. Keep new descriptions tight.
-- **Honour each skill's safety contract.** All four write; none of them is a
+- **Honour each skill's safety contract.** All five write; none of them is a
   read-only auditor.
   - `mise-migrate` — `--dry-run` is the default and mutates nothing; only an
     explicit `--apply` writes. It rewrites `pyproject.toml` in place and runs
@@ -104,6 +105,15 @@ at this repo's root, and adding one for tool mappings is a bug.
     no alias and is not facilitated. The manifest and config drop-in are always
     mode 0600. `revoke` sets `revoked: true` and keeps the row for audit
     history; it never deletes it, and there is no `unrevoke`.
+  - `runner-setup` — registration (Steps 1-4) always runs and changes a
+    remote host: it refuses (exit 3) when a `<repo>-runner` container already
+    exists instead of replacing it, checks that before minting a token, and
+    never puts the registration token on a command line (it travels on
+    `ssh sh -s` stdin). Workflow rewriting is `--dry-run` by default; only
+    `--apply` writes, and only under `.github/workflows/`. Site values (GHES
+    host, proxy, image, SSH alias) are env-overridable defaults in
+    `lib/register_runner.sh`, documented in `references/internal.md` — do not
+    scatter them elsewhere.
 - **Harness gaps are documented, not worked around silently.** These skills are
   written in Claude Code's vocabulary. When you add a step that depends on a
   Claude-Code-only capability, record the fallback in `GEMINI.md` and

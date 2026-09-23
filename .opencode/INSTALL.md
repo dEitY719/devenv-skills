@@ -16,7 +16,7 @@ project-level):
 ```
 
 Restart OpenCode. The plugin installs through OpenCode's plugin manager and
-registers all four skills.
+registers all five skills.
 
 OpenCode uses its own plugin install. If you also use Claude Code, Codex, or
 another harness, install this plugin separately for each one.
@@ -47,7 +47,7 @@ do not recognise. Short version:
   `"explore"` for read-only repo exploration)
 - "Invoke a skill" -> OpenCode's native `skill` tool
 
-All four devenv skills write, so their safety contracts matter here:
+All five devenv skills write, so their safety contracts matter here:
 
 - `mise-migrate` is dry-run by default. Without an explicit `--apply` it prints
   the plan and must not reach `apply_patch` or a mutating `bash`.
@@ -61,6 +61,9 @@ All four devenv skills write, so their safety contracts matter here:
   `add` needs a real TTY for its one `ssh-copy-id` password prompt — in a
   non-interactive session it fails fast and prints the command to run by hand.
   A host-fingerprint MISMATCH from `sync` is a hard stop; never bypass it.
+- `runner-setup` registers a runner container on a remote host over SSH on
+  every run; only its workflow rewrite is gated by `--apply`. It refuses an
+  existing `<repo>-runner` container rather than replacing it.
 
 ## Troubleshooting
 

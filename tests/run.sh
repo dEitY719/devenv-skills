@@ -14,6 +14,8 @@ CHECKS=(
     skills/symlink-manager/lib/symlink_migrate.sh
     skills/makefile-gen/lib/detect.sh
     skills/makefile-gen/lib/render.sh
+    skills/runner-setup/lib/patch_workflows.sh
+    skills/runner-setup/lib/register_runner.sh
 )
 
 # Every entry must be a tracked file, and CI must say so by name rather than
