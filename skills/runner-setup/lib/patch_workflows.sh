@@ -29,13 +29,15 @@
 #   warn=<file>:<line> <reason>
 # They are: runs-on other than ubuntu-latest that still looks Linux-bound
 # (ubuntu-22.04, ${{ ... }}, list or block form), a `with:` before
-# `uses: jdx/mise-action` in one step, and a job env that is neither a block
-# nor a one-line flow mapping (`env: {A: b}` is rewritten in place).
+# `uses: jdx/mise-action` in one step, a job env that is neither a block
+# nor a one-line flow mapping (`env: {A: b}` is rewritten in place; a flow
+# mapping over several lines is refused), and any YAML anchor or alias.
+# Block scalar content (`run: |`) is never scanned or rewritten.
 #
 # ponytail: line-oriented awk, not a YAML parser -- known shapes are rewritten
-# or refused, anything stranger (multi-line flow, anchors) passes through; the
-# dry-run diff is where a human catches that. A YAML parser would reorder
-# comments and keys; add one only if refusals become common.
+# or refused, anything the refusals miss passes through; the dry-run diff is
+# where a human catches that. A YAML parser would reorder comments and keys;
+# add one only if refusals become common.
 #
 # Called explicitly, never sourced. POSIX sh only.
 
@@ -83,8 +85,14 @@ transform() {
             if ($0 ~ /^ *- / && (stepcol < 0 || si + 2 <= stepcol)) { stepcol = si + 2; stepwith = ($0 ~ /^ *- with:/) }
             else if (stepcol >= 0 && si < stepcol) stepcol = -1
             else if (si == stepcol && $0 ~ /^ *with:/) stepwith = 1
-            if (stepcol >= 0 && stepwith && $0 ~ mise) badmise[FNR] = 1
-            if (envci_job != "") { envci[envci_job] = si; envci_job = "" }
+            # Only a uses: key at the step key column is a step; the same text
+            # deeper down is block scalar content (a run: | script).
+            if (stepcol >= 0 && $0 ~ mise && (si == stepcol || si + 2 == stepcol && $0 ~ /^ *- /)) {
+                ismise[FNR] = 1; if (stepwith) badmise[FNR] = 1
+            }
+            # A value-less env: whose next line is not a `KEY:` line is a
+            # flow mapping, alias or scalar continued below: refused in pass 2.
+            if (envci_job != "") { envci[envci_job] = si; envodd[envci_job] = ($0 !~ /^ *[<"\047A-Za-z0-9_][^:]*:([ \t]|$)/); envci_job = "" }
         }
         track($0)
         if (job != "" && $0 ~ /UV_NATIVE_TLS:/) hasuv[job] = 1
@@ -108,7 +116,15 @@ transform() {
             if (dropping) next
         }
 
-        if (envname == "internal" && line ~ mise) {
+        # Block scalar content (below `key: |` / `key: >`) is text, not YAML:
+        # emitted as is and never scanned. Outside it, an anchor or alias is
+        # refused -- rewriting one node would silently change every alias.
+        if (bsc >= 0 && !blank(line) && i <= bsc) bsc = -1
+        if (bsc >= 0) { print line; next }
+        if (line ~ /(:|^ *-)[ \t]+[|>][-+0-9]*[ \t]*(#.*)?$/) bsc = i + (line ~ /^ *- / ? 2 : 0)
+        if (!blank(line) && line ~ anchor) { warn("YAML anchor/alias; left as is"); print line; next }
+
+        if (envname == "internal" && (FNR in ismise)) {
             if (FNR in badmise) warn("with: before uses: jdx/mise-action; step left as is")
             else {
                 pre = line; sub(/uses:.*/, "", pre)
@@ -144,12 +160,14 @@ transform() {
             hasuv[job] = 1
         }
         print line
-        if (needuv && line ~ /^ *env:[ \t]*(#.*)?$/) { print cpad "UV_NATIVE_TLS: \"true\""; hasuv[job] = 1 }
+        if (needuv && line ~ /^ *env:[ \t]*(#.*)?$/ && envodd[job]) {
+            warn("job env: value on the next line is not a block mapping; add UV_NATIVE_TLS by hand"); hasuv[job] = 1
+        } else if (needuv && line ~ /^ *env:[ \t]*(#.*)?$/) { print cpad "UV_NATIVE_TLS: \"true\""; hasuv[job] = 1 }
         else if (needuv && !hasenv[job] && line ~ /^ *runs-on:/) {
             print kpad "env:"; print cpad "UV_NATIVE_TLS: \"true\""; hasuv[job] = 1
         }
     }
-    BEGIN { mise_col = -1; ubuntu = "^ *runs-on:[ \t]*[\"\047]?ubuntu-latest[\"\047]?[ \t]*(#.*)?$"; mise = "^ *(- )?uses:[ \t]*jdx/mise-action@" }
+    BEGIN { mise_col = -1; bsc = -1; anchor = "(^[ \t]*(-[ \t]+)*|:[ \t]+|[[{,][ \t]*)[&*][A-Za-z0-9_]"; ubuntu = "^ *runs-on:[ \t]*[\"\047]?ubuntu-latest[\"\047]?[ \t]*(#.*)?$"; mise = "^ *(- )?uses:[ \t]*jdx/mise-action@" }
     ' "$2" "$2"
 }
 
@@ -343,6 +361,74 @@ EOF
     run --env internal --apply "$tmp/indent" > /dev/null
     grep -q '^          UV_NATIVE_TLS: "true"$' "$tmp/indent/ci.yml" &&
         { ! python3 -c "import yaml" 2>/dev/null || python3 -c "import sys,yaml; yaml.safe_load(open(sys.argv[1]))" "$tmp/indent/ci.yml"; }; ck "UV_NATIVE_TLS follows the env block's own indent"
+
+    # Issue #33 shapes.
+    mkdir "$tmp/mflow" "$tmp/anchor" "$tmp/scalar"
+    cat > "$tmp/mflow/ci.yml" <<'EOF'
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    env: {FOO: bar,
+      BAZ: qux}
+    steps:
+      - run: make
+  b:
+    runs-on: ubuntu-latest
+    env:
+      {FOO: bar}
+    steps:
+      - run: make
+EOF
+    out=$(run --env internal --apply "$tmp/mflow"); rc=$?
+    [ "$rc" -eq 3 ] && ! grep -q UV_NATIVE_TLS "$tmp/mflow/ci.yml" &&
+        [ "$(printf "%s\n" "$out" | grep -c "^warn=")" -eq 2 ] &&
+        printf "%s\n" "$out" | grep -q "^warn=$tmp/mflow/ci.yml:4 " &&
+        printf "%s\n" "$out" | grep -q "^warn=$tmp/mflow/ci.yml:10 "; ck "multi-line flow job env is refused"
+
+    cat > "$tmp/anchor/ci.yml" <<'EOF'
+x-env: &common
+  FOO: bar
+jobs:
+  a:
+    runs-on: &linux ubuntu-latest
+    steps:
+      - run: ls *.txt
+  b:
+    runs-on: *linux
+    env:
+      <<: *common
+    steps:
+      - run: |
+          echo "a: *not-alias"
+          - &nope
+EOF
+    cp "$tmp/anchor/ci.yml" "$tmp/orig.yml"
+    out=$(run --env internal --apply "$tmp/anchor"); rc=$?
+    [ "$rc" -eq 3 ] && cmp -s "$tmp/anchor/ci.yml" "$tmp/orig.yml" &&
+        [ "$(printf "%s\n" "$out" | grep -c "^warn=.* YAML anchor/alias")" -eq 4 ] &&
+        [ "$(printf "%s\n" "$out" | grep -c "^warn=")" -eq 4 ] &&
+        ( for n in 1 5 9 11; do printf "%s\n" "$out" | grep -q "^warn=$tmp/anchor/ci.yml:$n " || exit 1; done ); ck "YAML anchors/aliases are refused, block scalars are not scanned"
+
+    cat > "$tmp/scalar/ci.yml" <<'EOF'
+jobs:
+  a:
+    runs-on: [self-hosted, Linux, X64]
+    env:
+      UV_NATIVE_TLS: "true"
+    steps:
+      - run: |
+          uses: jdx/mise-action@v2
+          - uses: jdx/mise-action@v2
+      - name: x
+        with:
+          a: b
+        run: |
+          uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@v2
+EOF
+    out=$(run --env internal --apply "$tmp/scalar"); rc=$?
+    [ "$rc" -eq 0 ] && [ "$(grep -c "jdx/mise-action" "$tmp/scalar/ci.yml")" -eq 3 ] &&
+        [ "$(grep -c "mise.run}\" | sh" "$tmp/scalar/ci.yml")" -eq 1 ]; ck "mise-action inside a block scalar is left alone"
 
     mkdir "$tmp/empty"
     run "$tmp/empty" > /dev/null; rc=$?
