@@ -1,6 +1,6 @@
 {
   "name": "devenv-skills",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Skills for one-time machine and toolchain environment setup: mise + uv migration, Makefile generation, dotfiles symlinks, SSH key delegation, self-hosted GitHub Actions runners",
   "type": "module",
   "main": ".opencode/plugins/devenv.js",

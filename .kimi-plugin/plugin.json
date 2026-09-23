@@ -1,6 +1,6 @@
 {
   "name": "devenv",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "One-time machine and toolchain setup: mise + uv migration, Makefile generation, dotfiles symlink management, audited SSH key delegation, self-hosted GitHub Actions runners.",
   "author": {
     "name": "dEitY719",
