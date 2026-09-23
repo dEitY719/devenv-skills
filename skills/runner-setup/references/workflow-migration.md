@@ -49,7 +49,12 @@ written):
 - a `with:` key written *before* `uses: jdx/mise-action` in the same step —
   the whole step keeps the action.
 - a job `env:` that is neither a block nor a one-line flow mapping (for
-  example `env: ${{ fromJSON(...) }}`) — rule 3 is skipped for that job.
+  example `env: ${{ fromJSON(...) }}`, a flow mapping spread over several
+  lines, or an `env:` whose value starts on the next line with `{`) — rule 3
+  is skipped for that job.
+- a YAML anchor or alias (`env: &common`, `<<: *common`, `runs-on: *linux`),
+  on every line that carries one — rewriting an anchored node would change
+  each alias of it too. Block scalar content (`run: |`) is not scanned.
 
 Handled rather than refused: a one-line flow env (`env: {A: b}`) becomes
 `env: {A: b, UV_NATIVE_TLS: "true"}`, and an existing `env:` block gains the
@@ -57,5 +62,7 @@ key at its own child indent, whatever the file's indent width.
 
 Not changed and not reported: mise-action inputs such as `version:` or
 `install_args:` (the manual step installs the latest mise and all tools from
-`mise.toml`), and anything stranger than the above (multi-line flow mappings,
-anchors). When a warn line or the diff shows one of these, edit it by hand.
+`mise.toml`), text inside a block scalar (a `uses: jdx/mise-action@` line in
+a `run: |` script is only matched at the step key column), and anything
+stranger than the above. When a warn line or the diff shows one of these,
+edit it by hand.
