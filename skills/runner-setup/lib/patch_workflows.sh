@@ -87,9 +87,7 @@ transform() {
             else if (si == stepcol && $0 ~ /^ *with:/) stepwith = 1
             # Only a uses: key at the step key column is a step; the same text
             # deeper down is block scalar content (a run: | script).
-            if (stepcol >= 0 && $0 ~ mise && (si == stepcol || si + 2 == stepcol && $0 ~ /^ *- /)) {
-                ismise[FNR] = 1; if (stepwith) badmise[FNR] = 1
-            }
+            if (stepcol >= 0 && $0 ~ mise && (si == stepcol || si + 2 == stepcol && $0 ~ /^ *- /)) misestep[FNR] = stepwith
             # A value-less env: whose next line is not a `KEY:` line is a
             # flow mapping, alias or scalar continued below: refused in pass 2.
             if (envci_job != "") { envci[envci_job] = si; envodd[envci_job] = ($0 !~ /^ *[<"\047A-Za-z0-9_][^:]*:([ \t]|$)/); envci_job = "" }
@@ -124,8 +122,8 @@ transform() {
         if (line ~ /(:|^ *-)[ \t]+[|>][-+0-9]*[ \t]*(#.*)?$/) bsc = i + (line ~ /^ *- / ? 2 : 0)
         if (!blank(line) && line ~ anchor) { warn("YAML anchor/alias; left as is"); print line; next }
 
-        if (envname == "internal" && (FNR in ismise)) {
-            if (FNR in badmise) warn("with: before uses: jdx/mise-action; step left as is")
+        if (envname == "internal" && (FNR in misestep)) {
+            if (misestep[FNR]) warn("with: before uses: jdx/mise-action; step left as is")
             else {
                 pre = line; sub(/uses:.*/, "", pre)
                 mise_col = length(pre); dropping = 0
@@ -160,10 +158,11 @@ transform() {
             hasuv[job] = 1
         }
         print line
-        if (needuv && line ~ /^ *env:[ \t]*(#.*)?$/ && envodd[job]) {
-            warn("job env: value on the next line is not a block mapping; add UV_NATIVE_TLS by hand"); hasuv[job] = 1
-        } else if (needuv && line ~ /^ *env:[ \t]*(#.*)?$/) { print cpad "UV_NATIVE_TLS: \"true\""; hasuv[job] = 1 }
-        else if (needuv && !hasenv[job] && line ~ /^ *runs-on:/) {
+        if (needuv && line ~ /^ *env:[ \t]*(#.*)?$/) {
+            if (envodd[job]) warn("job env: value on the next line is not a block mapping; add UV_NATIVE_TLS by hand")
+            else print cpad "UV_NATIVE_TLS: \"true\""
+            hasuv[job] = 1
+        } else if (needuv && !hasenv[job] && line ~ /^ *runs-on:/) {
             print kpad "env:"; print cpad "UV_NATIVE_TLS: \"true\""; hasuv[job] = 1
         }
     }
