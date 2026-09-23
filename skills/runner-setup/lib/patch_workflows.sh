@@ -429,6 +429,37 @@ EOF
     [ "$rc" -eq 0 ] && [ "$(grep -c "jdx/mise-action" "$tmp/scalar/ci.yml")" -eq 3 ] &&
         [ "$(grep -c "mise.run}\" | sh" "$tmp/scalar/ci.yml")" -eq 1 ]; ck "mise-action inside a block scalar is left alone"
 
+    # Block scalar tracking across comments, blank lines and back-to-back
+    # scalar keys; a comment between env: and its first key (PR #34 review).
+    mkdir "$tmp/bscalar"
+    cat > "$tmp/bscalar/ci.yml" <<'EOF'
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    env:
+      # comment
+      FOO: bar
+    steps:
+      - run: |
+          echo *x
+        # outdented comment
+      - name: two
+        run: >-
+          a: *b
+
+          # in-scalar
+        shell: bash
+      - run: |
+          c: &d
+      - uses: jdx/mise-action@v2
+EOF
+    out=$(run --env internal --apply "$tmp/bscalar"); rc=$?
+    got=$tmp/bscalar/ci.yml
+    [ "$rc" -eq 0 ] && ! printf "%s\n" "$out" | grep -q "^warn=" &&
+        grep -q "^          echo \*x$" "$got" && grep -q "^          a: \*b$" "$got" && grep -q "^          c: &d$" "$got" &&
+        sed -n 4p "$got" | grep -q "^    env:$" && sed -n 5p "$got" | grep -q '^      UV_NATIVE_TLS: "true"$' &&
+        ! grep -q "jdx/mise-action" "$got"; ck "block scalars end at the right line; comment after env: is not a value"
+
     mkdir "$tmp/empty"
     run "$tmp/empty" > /dev/null; rc=$?
     [ "$rc" -eq 1 ]; ck "empty dir exits 1"
