@@ -83,7 +83,7 @@ transform() {
             if ($0 ~ /^ *- / && (stepcol < 0 || si + 2 <= stepcol)) { stepcol = si + 2; stepwith = ($0 ~ /^ *- with:/) }
             else if (stepcol >= 0 && si < stepcol) stepcol = -1
             else if (si == stepcol && $0 ~ /^ *with:/) stepwith = 1
-            if (stepcol >= 0 && stepwith && $0 ~ /^ *(- )?uses:[ \t]*jdx\/mise-action@/) badmise[FNR] = 1
+            if (stepcol >= 0 && stepwith && $0 ~ mise) badmise[FNR] = 1
             if (envci_job != "") { envci[envci_job] = si; envci_job = "" }
         }
         track($0)
@@ -108,17 +108,19 @@ transform() {
             if (dropping) next
         }
 
-        if (FNR in badmise && envname == "internal") warn("with: before uses: jdx/mise-action; step left as is")
-        else if (envname == "internal" && match(line, /^ *(- )?uses:[ \t]*jdx\/mise-action@/)) {
-            pre = line; sub(/uses:.*/, "", pre)
-            mise_col = length(pre); dropping = 0
-            pad = sprintf("%" (mise_col + 2) "s", "")
-            print pre "run: |"
-            print pad "curl -fsSL \"${MISE_INSTALL_URL:-https://mise.run}\" | sh"
-            print pad "echo \"$HOME/.local/bin\" >> \"$GITHUB_PATH\""
-            print pad "echo \"$HOME/.local/share/mise/shims\" >> \"$GITHUB_PATH\""
-            print pad "\"$HOME/.local/bin/mise\" install"
-            next
+        if (envname == "internal" && line ~ mise) {
+            if (FNR in badmise) warn("with: before uses: jdx/mise-action; step left as is")
+            else {
+                pre = line; sub(/uses:.*/, "", pre)
+                mise_col = length(pre); dropping = 0
+                pad = sprintf("%" (mise_col + 2) "s", "")
+                print pre "run: |"
+                print pad "curl -fsSL \"${MISE_INSTALL_URL:-https://mise.run}\" | sh"
+                print pad "echo \"$HOME/.local/bin\" >> \"$GITHUB_PATH\""
+                print pad "echo \"$HOME/.local/share/mise/shims\" >> \"$GITHUB_PATH\""
+                print pad "\"$HOME/.local/bin/mise\" install"
+                next
+            }
         }
 
         atkey = (job != "" && (job in kind) && i == kind[job])
@@ -129,7 +131,7 @@ transform() {
             line = kpad "runs-on: [self-hosted, Linux, X64]"
         } else if (atkey && line ~ /^ *runs-on:/ && line !~ /self-hosted/) {
             v = line; sub(/^ *runs-on:[ \t]*/, "", v); sub(/[ \t]*#.*$/, "", v)
-            if (v == "" || v ~ /^[[{]/ || v ~ /\$\{\{/ || v ~ /ubuntu/)
+            if (v == "" || v ~ /^[[{]|\$\{\{|ubuntu/)
                 warn("runs-on: " (v == "" ? "block form" : v) " is not ubuntu-latest; left as is")
         }
         # One-line flow env (`env: {A: b}`) gains the key inside the braces;
@@ -147,7 +149,7 @@ transform() {
             print kpad "env:"; print cpad "UV_NATIVE_TLS: \"true\""; hasuv[job] = 1
         }
     }
-    BEGIN { mise_col = -1; ubuntu = "^ *runs-on:[ \t]*[\"\047]?ubuntu-latest[\"\047]?[ \t]*(#.*)?$" }
+    BEGIN { mise_col = -1; ubuntu = "^ *runs-on:[ \t]*[\"\047]?ubuntu-latest[\"\047]?[ \t]*(#.*)?$"; mise = "^ *(- )?uses:[ \t]*jdx/mise-action@" }
     ' "$2" "$2"
 }
 
