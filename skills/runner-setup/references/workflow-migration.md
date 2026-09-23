@@ -18,7 +18,7 @@ Rule 2's replacement step keeps the step's other keys (`name:`, `id:`, `if:`):
 ```yaml
       - name: Setup mise
         run: |
-          curl -fsSL https://mise.run | sh
+          curl -fsSL "${MISE_INSTALL_URL:-https://mise.run}" | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "$HOME/.local/share/mise/shims" >> "$GITHUB_PATH"
           "$HOME/.local/bin/mise" install
@@ -28,8 +28,9 @@ Rule 2's replacement step keeps the step's other keys (`name:`, `id:`, `if:`):
 the step reaches `mise.run` and the tool downloads through the container's
 proxy and CA chain (`references/internal.md`) — the same egress
 `jdx/mise-action` itself needs; what GHES lacks is the marketplace *action*,
-not outbound HTTPS. A site without that egress must point the step at an
-internal mirror by hand. The
+not outbound HTTPS. A site without that egress sets `MISE_INSTALL_URL` (runner env, or a
+workflow/job `env:`) to an internal mirror of the install script; the
+tool downloads then follow mise's own mirror settings in `mise.toml`. The
 shims on `GITHUB_PATH` make the tools visible to every later step.
 
 Rule 3 exists because the internal CA chain is in the system store, which uv

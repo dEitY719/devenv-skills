@@ -94,7 +94,7 @@ transform() {
             mise_col = length(pre); dropping = 0
             pad = sprintf("%" (mise_col + 2) "s", "")
             print pre "run: |"
-            print pad "curl -fsSL https://mise.run | sh"
+            print pad "curl -fsSL \"${MISE_INSTALL_URL:-https://mise.run}\" | sh"
             print pad "echo \"$HOME/.local/bin\" >> \"$GITHUB_PATH\""
             print pad "echo \"$HOME/.local/share/mise/shims\" >> \"$GITHUB_PATH\""
             print pad "\"$HOME/.local/bin/mise\" install"
@@ -207,7 +207,7 @@ EOF
     ! grep -q "jdx/mise-action" "$got"; ck "mise-action removed"
     ! grep -q "install: true\|cache: true" "$got"; ck "mise with: blocks dropped"
     grep -q "        id: mise" "$got" && grep -q "name: Setup mise" "$got"; ck "sibling step keys kept"
-    [ "$(grep -c "mise.run | sh" "$got")" -eq 2 ]; ck "manual install inserted twice"
+    [ "$(grep -c "MISE_INSTALL_URL:-https://mise.run}\" | sh" "$got")" -eq 2 ]; ck "manual install inserted twice"
     sed -n "/^  test:/,/^  lint:/p" "$got" | grep -q "^    env:$"; ck "env block added to job without one"
     [ "$(grep -c "^      UV_NATIVE_TLS: \"true\"$" "$got")" -eq 2 ]; ck "UV_NATIVE_TLS in both self-hosted jobs"
     grep -q "^      FOO: bar$" "$got"; ck "existing env kept"
