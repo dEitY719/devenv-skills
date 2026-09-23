@@ -36,15 +36,26 @@ shims on `GITHUB_PATH` make the tools visible to every later step.
 Rule 3 exists because the internal CA chain is in the system store, which uv
 only consults with `UV_NATIVE_TLS=true`.
 
-## Left untouched (review the diff)
+## Refused or left untouched
 
-The patcher is line-oriented, not a YAML parser. It does not change:
+The patcher is line-oriented, not a YAML parser. A shape it will not rewrite is
+left as is and reported as `warn=<file>:<line> <reason>` before the summary
+line, and the run exits 3 (the other changes are still made, or with `--apply`
+written):
 
-- `runs-on` values other than `ubuntu-latest` — `ubuntu-22.04`,
-  `${{ matrix.os }}`, `windows-latest`, and so on.
-- a flow-style job env (`env: {A: b}`) — rule 3 is skipped for that job.
-- a `with:` key written *before* `uses: jdx/mise-action` in the same step.
-- mise-action inputs such as `version:` or `install_args:`; the manual step
-  installs the latest mise and all tools from `mise.toml`.
+- a Linux-looking `runs-on` other than `ubuntu-latest` — `ubuntu-22.04`,
+  `${{ matrix.os }}`, a list (`[ubuntu-latest]`) or block list. Plain other
+  OS labels (`windows-latest`, `macos-14`) are skipped silently.
+- a `with:` key written *before* `uses: jdx/mise-action` in the same step —
+  the whole step keeps the action.
+- a job `env:` that is neither a block nor a one-line flow mapping (for
+  example `env: ${{ fromJSON(...) }}`) — rule 3 is skipped for that job.
 
-When the diff shows one of these, edit that line by hand after `--apply`.
+Handled rather than refused: a one-line flow env (`env: {A: b}`) becomes
+`env: {A: b, UV_NATIVE_TLS: "true"}`, and an existing `env:` block gains the
+key at its own child indent, whatever the file's indent width.
+
+Not changed and not reported: mise-action inputs such as `version:` or
+`install_args:` (the manual step installs the latest mise and all tools from
+`mise.toml`), and anything stranger than the above (multi-line flow mappings,
+anchors). When a warn line or the diff shows one of these, edit it by hand.

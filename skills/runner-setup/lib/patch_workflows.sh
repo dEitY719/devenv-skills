@@ -23,11 +23,19 @@
 # exit 0  done (with or without changes)
 # exit 1  dir missing or holds no workflow files
 # exit 2  usage error
+# exit 3  done, but a shape was refused (see the warn= lines)
 #
-# ponytail: line-oriented awk, not a YAML parser. It assumes block-style YAML
-# with consistent indentation (what `actions/starter-workflows` emits). Flow
-# style (`env: {A: b}`) or a `with:` placed before `uses:` is left untouched;
-# the dry-run diff is where a human catches that.
+# A refused shape is printed before the summary, one per line, and left as is:
+#   warn=<file>:<line> <reason>
+# They are: runs-on other than ubuntu-latest that still looks Linux-bound
+# (ubuntu-22.04, ${{ ... }}, list or block form), a `with:` before
+# `uses: jdx/mise-action` in one step, and a job env that is neither a block
+# nor a one-line flow mapping (`env: {A: b}` is rewritten in place).
+#
+# ponytail: line-oriented awk, not a YAML parser -- known shapes are rewritten
+# or refused, anything stranger (multi-line flow, anchors) passes through; the
+# dry-run diff is where a human catches that. A YAML parser would reorder
+# comments and keys; add one only if refusals become common.
 #
 # Called explicitly, never sourced. POSIX sh only.
 
@@ -45,13 +53,15 @@ dir defaults to .github/workflows.
 EOF
 }
 
-# transform <env> <file> -- print the patched file on stdout. Two passes over
+# transform <env> <file> <warnfile> -- print the patched file on stdout. Two passes over
 # the same file: pass 1 learns each job's shape (key indent, whether it has a
 # job-level env: block, whether UV_NATIVE_TLS is already set, whether it runs
-# on ubuntu-latest / self-hosted), pass 2 emits.
+# on ubuntu-latest / self-hosted), pass 2 emits. A shape it will not rewrite
+# is appended to <warnfile> as `warn=<file>:<line> <reason>` and left as is.
 transform() {
-    awk -v envname="$1" '
+    awk -v envname="$1" -v warnf="$3" '
     function ind(s) { match(s, /^ */); return RLENGTH }
+    function warn(why) { printf "warn=%s:%d %s\n", FILENAME, FNR, why > warnf }
     function blank(s) { return s ~ /^[ \t]*(#.*)?$/ }
     # Track the current job for either pass. Sets job, ki (job key indent).
     function track(line,   i) {
@@ -64,14 +74,23 @@ transform() {
         if (i == ji) { job = line; sub(/^ */, "", job); sub(/:.*/, "", job); want_ki = 1; return }
         if (job != "" && want_ki) { kind[job] = i; want_ki = 0 }
     }
-    FNR == 1 { injobs = 0; job = ""; want_ki = 0 }
+    FNR == 1 { injobs = 0; job = ""; want_ki = 0; stepcol = -1; envci_job = "" }
     NR == FNR {
-        track($0)
-        if (job == "" || !(job in kind) || ind($0) != kind[job]) {
-            if (job != "" && $0 ~ /UV_NATIVE_TLS:/) hasuv[job] = 1
-            next
+        # Step tracking: a with: key seen before uses: jdx/mise-action in the
+        # same list item marks that uses: line for refusal in pass 2.
+        if (!blank($0)) {
+            si = ind($0)
+            if ($0 ~ /^ *- / && (stepcol < 0 || si + 2 <= stepcol)) { stepcol = si + 2; stepwith = ($0 ~ /^ *- with:/) }
+            else if (stepcol >= 0 && si < stepcol) stepcol = -1
+            else if (si == stepcol && $0 ~ /^ *with:/) stepwith = 1
+            if (stepcol >= 0 && stepwith && $0 ~ /^ *(- )?uses:[ \t]*jdx\/mise-action@/) badmise[FNR] = 1
+            if (envci_job != "") { envci[envci_job] = si; envci_job = "" }
         }
-        if ($0 ~ /^ *env:[ \t]*(#.*)?$/) hasenv[job] = 1
+        track($0)
+        if (job != "" && $0 ~ /UV_NATIVE_TLS:/) hasuv[job] = 1
+        if (job == "" || !(job in kind) || ind($0) != kind[job]) next
+        if ($0 ~ /^ *env:/) hasenv[job] = 1
+        if ($0 ~ /^ *env:[ \t]*(#.*)?$/) envci_job = job
         if ($0 ~ ubuntu || $0 ~ /^ *runs-on:.*self-hosted/) selfhost[job] = 1
         next
     }
@@ -89,7 +108,8 @@ transform() {
             if (dropping) next
         }
 
-        if (envname == "internal" && match(line, /^ *(- )?uses:[ \t]*jdx\/mise-action@/)) {
+        if (FNR in badmise && envname == "internal") warn("with: before uses: jdx/mise-action; step left as is")
+        else if (envname == "internal" && match(line, /^ *(- )?uses:[ \t]*jdx\/mise-action@/)) {
             pre = line; sub(/uses:.*/, "", pre)
             mise_col = length(pre); dropping = 0
             pad = sprintf("%" (mise_col + 2) "s", "")
@@ -103,10 +123,23 @@ transform() {
 
         atkey = (job != "" && (job in kind) && i == kind[job])
         needuv = (envname == "internal" && atkey && selfhost[job] && !hasuv[job])
-        if (atkey) { kpad = sprintf("%" kind[job] "s", ""); cpad = sprintf("%" (2 * kind[job] - ji) "s", "") }
+        if (atkey) { kpad = sprintf("%" kind[job] "s", ""); cpad = sprintf("%" ((job in envci) ? envci[job] : 2 * kind[job] - ji) "s", "") }
 
         if (atkey && line ~ ubuntu) {
             line = kpad "runs-on: [self-hosted, Linux, X64]"
+        } else if (atkey && line ~ /^ *runs-on:/ && line !~ /self-hosted/) {
+            v = line; sub(/^ *runs-on:[ \t]*/, "", v); sub(/[ \t]*#.*$/, "", v)
+            if (v == "" || v ~ /^[[{]/ || v ~ /\$\{\{/ || v ~ /ubuntu/)
+                warn("runs-on: " (v == "" ? "block form" : v) " is not ubuntu-latest; left as is")
+        }
+        # One-line flow env (`env: {A: b}`) gains the key inside the braces;
+        # any other non-block env value is refused.
+        if (needuv && line ~ /^ *env:[ \t]*[^ \t#]/) {
+            if (line ~ /^ *env:[ \t]*\{[^{}]*\}[ \t]*(#.*)?$/) {
+                p = index(line, "}"); head = substr(line, 1, p - 1); sub(/[ \t]*$/, "", head)
+                line = head (head ~ /\{$/ ? "" : head ~ /,$/ ? " " : ", ") "UV_NATIVE_TLS: \"true\"" substr(line, p)
+            } else warn("job env: is not a block or one-line flow mapping; add UV_NATIVE_TLS by hand")
+            hasuv[job] = 1
         }
         print line
         if (needuv && line ~ /^ *env:[ \t]*(#.*)?$/) { print cpad "UV_NATIVE_TLS: \"true\""; hasuv[job] = 1 }
@@ -133,12 +166,15 @@ run() {
     done
     case "$env" in internal|public) ;; *) usage >&2; return 2 ;; esac
 
-    files=0 changed=0
+    files=0 changed=0 warned=0
     work=$(mktemp) || return 1
+    warns=$(mktemp) || { rm -f "$work"; return 1; }
     for f in "$dir"/*.yml "$dir"/*.yaml; do
         [ -f "$f" ] || continue
         files=$((files + 1))
-        transform "$env" "$f" > "$work" || { rm -f "$work"; return 1; }
+        : > "$warns"
+        transform "$env" "$f" "$warns" > "$work" || { rm -f "$work" "$warns"; return 1; }
+        if [ -s "$warns" ]; then cat "$warns"; warned=1; fi
         cmp -s "$f" "$work" && continue
         changed=$((changed + 1))
         if [ "$apply" -eq 1 ]; then
@@ -148,13 +184,14 @@ run() {
         fi
         printf 'patched=%s\n' "$f"
     done
-    rm -f "$work"
+    rm -f "$work" "$warns"
     if [ "$files" -eq 0 ]; then
         printf 'status=no-workflows dir=%s\n' "$dir"
         return 1
     fi
     [ "$apply" -eq 1 ] && mode=apply || mode=dry-run
     printf 'mode=%s changed=%s files=%s\n' "$mode" "$changed" "$files"
+    [ "$warned" -eq 0 ] || return 3
 }
 
 self_test() {
@@ -221,6 +258,78 @@ EOF
     cp "$tmp/orig.yml" "$got"
     run --env public --apply "$tmp/wf" > /dev/null
     [ "$(grep -c "self-hosted" "$got")" -eq 2 ] && grep -q "jdx/mise-action" "$got" && ! grep -q UV_NATIVE_TLS "$got"; ck "public: runs-on only"
+
+    # Issue #30 shapes, one dir each so a warn from one cannot mask another.
+    mkdir "$tmp/flow" "$tmp/with" "$tmp/runs" "$tmp/indent"
+    cat > "$tmp/flow/ci.yml" <<'EOF'
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    env: {FOO: bar}  # note
+    steps:
+      - run: make
+  b:
+    runs-on: ubuntu-latest
+    env: {}
+    steps:
+      - run: make
+EOF
+    run --env internal --apply "$tmp/flow" > /dev/null; rc=$?
+    got=$tmp/flow/ci.yml
+    [ "$rc" -eq 0 ] && [ "$(grep -c "env:" "$got")" -eq 2 ] &&
+        grep -q '^    env: {FOO: bar, UV_NATIVE_TLS: "true"}  # note$' "$got" &&
+        grep -q '^    env: {UV_NATIVE_TLS: "true"}$' "$got"; ck "flow-style job env gains UV_NATIVE_TLS in place"
+    cp "$got" "$tmp/once.yml"; run --env internal --apply "$tmp/flow" > /dev/null
+    cmp -s "$got" "$tmp/once.yml"; ck "flow-style env rewrite is idempotent"
+
+    cat > "$tmp/with/ci.yml" <<'EOF'
+jobs:
+  a:
+    runs-on: [self-hosted, Linux, X64]
+    env:
+      UV_NATIVE_TLS: "true"
+    steps:
+      - name: mise
+        with:
+          install: true
+        uses: jdx/mise-action@v2
+EOF
+    cp "$tmp/with/ci.yml" "$tmp/once.yml"
+    out=$(run --env internal --apply "$tmp/with"); rc=$?
+    [ "$rc" -eq 3 ] && cmp -s "$tmp/with/ci.yml" "$tmp/once.yml" &&
+        printf "%s\n" "$out" | grep -q "^warn=$tmp/with/ci.yml:10 with: before uses: jdx/mise-action"; ck "with: before mise-action is refused with warn + exit 3"
+
+    cat > "$tmp/runs/ci.yml" <<'EOF'
+jobs:
+  a:
+    runs-on: ubuntu-22.04
+  b:
+    runs-on: ${{ matrix.os }}
+  c:
+    runs-on: [ubuntu-latest]
+  d:
+    runs-on:
+      - ubuntu-latest
+  e:
+    runs-on: macos-latest
+EOF
+    out=$(run --env internal "$tmp/runs"); rc=$?
+    [ "$rc" -eq 3 ] && [ "$(printf "%s\n" "$out" | grep -c "^warn=$tmp/runs/ci.yml:")" -eq 4 ] &&
+        printf "%s\n" "$out" | grep -q "^warn=$tmp/runs/ci.yml:3 " &&
+        printf "%s\n" "$out" | grep -q "^warn=$tmp/runs/ci.yml:9 "; ck "unhandled runs-on shapes warn, other OS stays quiet"
+
+    cat > "$tmp/indent/ci.yml" <<'EOF'
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        env:
+          FOO: bar
+        steps:
+          - run: make
+EOF
+    run --env internal --apply "$tmp/indent" > /dev/null
+    grep -q '^          UV_NATIVE_TLS: "true"$' "$tmp/indent/ci.yml" &&
+        { ! python3 -c "import yaml" 2>/dev/null || python3 -c "import sys,yaml; yaml.safe_load(open(sys.argv[1]))" "$tmp/indent/ci.yml"; }; ck "UV_NATIVE_TLS follows the env block's own indent"
 
     mkdir "$tmp/empty"
     run "$tmp/empty" > /dev/null; rc=$?

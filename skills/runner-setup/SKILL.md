@@ -76,8 +76,8 @@ sh <skill-dir>/lib/patch_workflows.sh --env <e> [--apply] [.github/workflows]
 Rules per env: `references/workflow-migration.md`. Without `--apply` it prints
 a `diff -u` per file and writes nothing; with `--apply` it rewrites in place.
 Both end with `mode=<m> changed=<n> files=<k>`. `status=no-workflows` (exit
-1) is not a failure of the runner — report it and finish. Review the diff for
-the known blind spots (flow-style `env:`, matrix `runs-on`) listed there.
+1) is not a failure of the runner — report it and finish. Exit 3 means some
+shapes were refused: relay each `warn=<file>:<line>` line as a hand edit.
 
 ## Step 4: Report
 
