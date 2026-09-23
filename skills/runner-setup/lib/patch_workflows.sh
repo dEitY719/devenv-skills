@@ -294,12 +294,14 @@ jobs:
       - name: mise
         with:
           install: true
+          args:
+          - nested list must not end the step
         uses: jdx/mise-action@v2
 EOF
     cp "$tmp/with/ci.yml" "$tmp/once.yml"
     out=$(run --env internal --apply "$tmp/with"); rc=$?
     [ "$rc" -eq 3 ] && cmp -s "$tmp/with/ci.yml" "$tmp/once.yml" &&
-        printf "%s\n" "$out" | grep -q "^warn=$tmp/with/ci.yml:10 with: before uses: jdx/mise-action"; ck "with: before mise-action is refused with warn + exit 3"
+        printf "%s\n" "$out" | grep -q "^warn=$tmp/with/ci.yml:12 with: before uses: jdx/mise-action"; ck "with: before mise-action is refused with warn + exit 3"
 
     cat > "$tmp/runs/ci.yml" <<'EOF'
 jobs:
@@ -313,7 +315,7 @@ jobs:
     runs-on:
       - ubuntu-latest
   e:
-    runs-on: macos-latest
+    runs-on: macos-latest # not ubuntu
 EOF
     out=$(run --env internal "$tmp/runs"); rc=$?
     [ "$rc" -eq 3 ] && [ "$(printf "%s\n" "$out" | grep -c "^warn=$tmp/runs/ci.yml:")" -eq 4 ] &&
