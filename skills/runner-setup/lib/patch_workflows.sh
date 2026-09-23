@@ -297,10 +297,19 @@ jobs:
           args:
           - nested list must not end the step
         uses: jdx/mise-action@v2
+  b:
+      runs-on: [self-hosted, Linux, X64]
+      env:
+          UV_NATIVE_TLS: "true"
+      steps:
+          - uses: jdx/mise-action@v2
+            with:
+              install: true
 EOF
-    cp "$tmp/with/ci.yml" "$tmp/once.yml"
     out=$(run --env internal --apply "$tmp/with"); rc=$?
-    [ "$rc" -eq 3 ] && cmp -s "$tmp/with/ci.yml" "$tmp/once.yml" &&
+    got=$tmp/with/ci.yml
+    [ "$rc" -eq 3 ] && [ "$(grep -c "jdx/mise-action" "$got")" -eq 1 ] && [ "$(grep -c "install: true" "$got")" -eq 1 ] &&
+        [ "$(printf "%s\n" "$out" | grep -c "^warn=")" -eq 1 ] &&
         printf "%s\n" "$out" | grep -q "^warn=$tmp/with/ci.yml:12 with: before uses: jdx/mise-action"; ck "with: before mise-action is refused with warn + exit 3"
 
     cat > "$tmp/runs/ci.yml" <<'EOF'
