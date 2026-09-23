@@ -20,6 +20,8 @@ The script builds a minimal image on the host the first time, tagged
 - `ca-certificates`, `curl`, `git`
 - `actions/runner` `RUNNER_VERSION` (default `2.328.0`) unpacked in
   `/actions-runner`, plus its `bin/installdependencies.sh`
+- a non-root `runner` user that owns `/actions-runner` and runs the
+  container; no Docker socket is mounted
 
 The runner updates itself after registration, so an old `RUNNER_VERSION`
 only costs one self-update. Anything a job needs beyond that (mise, uv,
