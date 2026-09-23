@@ -19,7 +19,9 @@ certificates (SECDS chain + McAfee) and `shellcheck`. The script still passes
 the proxy variables explicitly, so a container is correct even if the image
 defaults drift. The image is expected to hold the runner under `RUNNER_DIR`
 (`/actions-runner`); the container runs `config.sh` there on first start only
-and `run.sh` on every start.
+and `run.sh` on every start. Because this script does not control that
+image's user, the internal container is started with
+`RUNNER_ALLOW_RUNASROOT=1`; the public image runs as a non-root user instead.
 
 GitHub.com marketplace actions are not reachable from GHES, which is why the
 workflow migration replaces `jdx/mise-action` with a manual install step

@@ -132,10 +132,15 @@ RUN apt-get update \
  && mkdir /actions-runner && cd /actions-runner \
  && curl -fsSL "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz" | tar xz \
  && ./bin/installdependencies.sh \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd -m runner && chown -R runner /actions-runner
+USER runner
 DOCKERFILE
 fi
-set -- -e RUNNER_URL -e RUNNER_NAME -e RUNNER_LABELS -e RUNNER_DIR -e RUNNER_TOKEN -e RUNNER_ALLOW_RUNASROOT=1
+set -- -e RUNNER_URL -e RUNNER_NAME -e RUNNER_LABELS -e RUNNER_DIR -e RUNNER_TOKEN
+# The public image runs as its own `runner` user; only the reused internal
+# image, whose user this script does not control, may need root.
+[ "$BUILD" = 1 ] || set -- "$@" -e RUNNER_ALLOW_RUNASROOT=1
 if [ -n "$PROXY" ]; then
     export http_proxy="$PROXY" https_proxy="$PROXY" HTTP_PROXY="$PROXY" HTTPS_PROXY="$PROXY"
     export no_proxy="$NO_PROXY_V" NO_PROXY="$NO_PROXY_V"
@@ -248,6 +253,14 @@ EOF
     [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q '^\[OK\]'; ck "e2e: registers and verifies online"
     ! grep -q SECRET-TKN "$tmp/ssh.argv"; ck "e2e: token never on an ssh command line"
     grep -q "RUNNER_TOKEN='SECRET-TKN'" "$tmp/remote.sh" && sh -n "$tmp/remote.sh"; ck "e2e: remote script carries token and parses"
+    cat > "$tmp/bin/docker" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >> "$STUB/docker.argv"
+EOF
+    chmod +x "$tmp/bin/docker"
+    STUB=$tmp PATH="$tmp/bin:$PATH" sh "$tmp/remote.sh" &&
+        grep -q '^run -d --name r-runner' "$tmp/docker.argv" && ! grep -q RUNASROOT "$tmp/docker.argv"
+    ck "e2e: public container runs without RUNNER_ALLOW_RUNASROOT"
     printf 'other\nr-runner\n' > "$tmp/names"
     STUB=$tmp PATH="$tmp/bin:$PATH" register --env public --host box --repo o/r > /dev/null 2>&1; [ $? -eq 3 ]
     ck "e2e: existing container refused with exit 3"

@@ -24,7 +24,12 @@ Rule 2's replacement step keeps the step's other keys (`name:`, `id:`, `if:`):
           "$HOME/.local/bin/mise" install
 ```
 
-`mise install` reads the repo's `mise.toml`, so uv comes from there. The
+`mise install` reads the repo's `mise.toml`, so uv comes from there. On GHES
+the step reaches `mise.run` and the tool downloads through the container's
+proxy and CA chain (`references/internal.md`) — the same egress
+`jdx/mise-action` itself needs; what GHES lacks is the marketplace *action*,
+not outbound HTTPS. A site without that egress must point the step at an
+internal mirror by hand. The
 shims on `GITHUB_PATH` make the tools visible to every later step.
 
 Rule 3 exists because the internal CA chain is in the system store, which uv
