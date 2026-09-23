@@ -1,7 +1,7 @@
 {
   "name": "devenv",
   "version": "0.2.5",
-  "description": "Set up a machine and its toolchain once: migrate a legacy Python venv project to mise + uv, generate a stack-aware Makefile, manage dotfiles config files as symlinks, and delegate SSH keys to hosts through an audited manifest.",
+  "description": "Set up a machine and its toolchain once: migrate a legacy Python venv project to mise + uv, generate a stack-aware Makefile, manage dotfiles config files as symlinks, delegate SSH keys to hosts through an audited manifest, and register a Docker-container self-hosted GitHub Actions runner.",
   "author": {
     "name": "dEitY719",
     "url": "https://github.com/dEitY719"
@@ -24,7 +24,7 @@
   "interface": {
     "displayName": "Devenv",
     "shortDescription": "One-time machine and toolchain environment setup",
-    "longDescription": "Devenv bundles the four skills used to set a machine up once and leave it reproducible: mise-migrate converts a legacy Python venv/pip project into the canonical mise + uv structure, makefile-gen detects a project's stack and generates a Makefile whose help/build/run/clear targets delegate to the existing mise tasks, package.json scripts or run scripts, symlink-manager moves a config file into the dotfiles repo and links it back with a backup, and ssh-delegate replaces ad-hoc ssh-copy-id with a manifest-backed, fingerprint-pinned, audit-logged delegation workflow. All four write, and each stops for confirmation (or defaults to a dry run) before it does.",
+    "longDescription": "Devenv bundles the five skills used to set a machine up once and leave it reproducible: mise-migrate converts a legacy Python venv/pip project into the canonical mise + uv structure, makefile-gen detects a project's stack and generates a Makefile whose help/build/run/clear targets delegate to the existing mise tasks, package.json scripts or run scripts, symlink-manager moves a config file into the dotfiles repo and links it back with a backup, and ssh-delegate replaces ad-hoc ssh-copy-id with a manifest-backed, fingerprint-pinned, audit-logged delegation workflow, and runner-setup registers a Docker-container self-hosted GitHub Actions runner for a GHES or GitHub.com repo and moves its workflows onto it. All five write, and each stops for confirmation (or defaults to a dry run) before it does.",
     "developerName": "dEitY719",
     "category": "Developer Tools",
     "capabilities": [

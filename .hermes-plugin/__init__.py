@@ -1,6 +1,6 @@
 """Hermes Agent registration for the `devenv` skills plugin.
 
-Registers the four devenv skills with Hermes' native skill loader so
+Registers the devenv skills with Hermes' native skill loader so
 `skill_view("devenv:<name>")` can load them on demand.
 
 Unlike superpowers, this plugin injects no session bootstrap context: the
