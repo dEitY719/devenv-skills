@@ -94,7 +94,8 @@ resolve() {
         [ -n "$parsed" ] || { err "cannot detect repo from origin ('$url'); pass --repo owner/name"; return 2; }
         REMOTE_HOST=${parsed% *} REPO=${parsed#* }
     fi
-    case "$REPO" in */*/*|/*|*/|*' '*|'') err "--repo must be owner/name (got '$REPO')"; return 2 ;; */*) ;; *) err "--repo must be owner/name (got '$REPO')"; return 2 ;; esac
+    case "$REPO" in */*/*|*' '*) false ;; ?*/?*) ;; *) false ;; esac ||
+        { err "--repo must be owner/name (got '$REPO')"; return 2; }
     NAME=${REPO#*/}
     LABEL=${LABEL:-$NAME-build}
     CONTAINER=$NAME-runner

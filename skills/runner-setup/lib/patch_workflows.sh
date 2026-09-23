@@ -72,7 +72,7 @@ transform() {
             next
         }
         if ($0 ~ /^ *env:[ \t]*(#.*)?$/) hasenv[job] = 1
-        if ($0 ~ /^ *runs-on:[ \t]*["\047]?ubuntu-latest["\047]?[ \t]*(#.*)?$/ || $0 ~ /^ *runs-on:.*self-hosted/) selfhost[job] = 1
+        if ($0 ~ ubuntu || $0 ~ /^ *runs-on:.*self-hosted/) selfhost[job] = 1
         next
     }
     {
@@ -81,11 +81,13 @@ transform() {
         i = ind(line)
 
         # Inside a replaced mise-action step: drop its with: block.
-        if (mise_col >= 0 && !blank(line)) {
-            if (i < mise_col || (i == mise_col - 2 && line ~ /^ *- /)) { mise_col = -1; dropping = 0 }
-            else if (i == mise_col) dropping = (line ~ /^ *with:[ \t]*(#.*)?$/)
+        if (mise_col >= 0) {
+            if (!blank(line)) {
+                if (i < mise_col || (i == mise_col - 2 && line ~ /^ *- /)) { mise_col = -1; dropping = 0 }
+                else if (i == mise_col) dropping = (line ~ /^ *with:[ \t]*(#.*)?$/)
+            }
             if (dropping) next
-        } else if (mise_col >= 0 && dropping) next
+        }
 
         if (envname == "internal" && match(line, /^ *(- )?uses:[ \t]*jdx\/mise-action@/)) {
             pre = line; sub(/uses:.*/, "", pre)
@@ -101,10 +103,9 @@ transform() {
 
         atkey = (job != "" && (job in kind) && i == kind[job])
         needuv = (envname == "internal" && atkey && selfhost[job] && !hasuv[job])
-        kpad = sprintf("%" kind[job] "s", "")
-        cpad = sprintf("%" (2 * kind[job] - ji) "s", "")
+        if (atkey) { kpad = sprintf("%" kind[job] "s", ""); cpad = sprintf("%" (2 * kind[job] - ji) "s", "") }
 
-        if (atkey && line ~ /^ *runs-on:[ \t]*["\047]?ubuntu-latest["\047]?[ \t]*(#.*)?$/) {
+        if (atkey && line ~ ubuntu) {
             line = kpad "runs-on: [self-hosted, Linux, X64]"
         }
         print line
@@ -113,7 +114,7 @@ transform() {
             print kpad "env:"; print cpad "UV_NATIVE_TLS: \"true\""; hasuv[job] = 1
         }
     }
-    BEGIN { mise_col = -1 }
+    BEGIN { mise_col = -1; ubuntu = "^ *runs-on:[ \t]*[\"\047]?ubuntu-latest[\"\047]?[ \t]*(#.*)?$" }
     ' "$2" "$2"
 }
 
