@@ -66,7 +66,8 @@ transform() {
     function warn(why) { printf "warn=%s:%d %s\n", FILENAME, FNR, why > warnf }
     function blank(s) { return s ~ /^[ \t]*(#.*)?$/ }
     # Block scalar content (below `key: |` / `key: >`) is text, not YAML:
-    # 1 for such a line, never scanned. Both passes track it (bsc).
+    # 1 for such a line, never scanned. Both passes track it (bsc); pass 1
+    # skips the line outright, pass 2 prints it as is.
     function scalar(line,   i) {
         i = ind(line)
         if (bsc >= 0 && !blank(line) && i <= bsc) bsc = -1
@@ -87,6 +88,9 @@ transform() {
     }
     FNR == 1 { injobs = 0; job = ""; want_ki = 0; stepcol = -1; envci_job = ""; bsc = -1 }
     NR == FNR {
+        # Block scalar body lines are text: nothing below reads them. The
+        # opener and the line that ends a scalar still fall through.
+        if (scalar($0)) next
         # Step tracking: a with: key seen before uses: jdx/mise-action in the
         # same list item marks that uses: line for refusal in pass 2.
         if (!blank($0)) {
@@ -94,8 +98,7 @@ transform() {
             if ($0 ~ /^ *- / && (stepcol < 0 || si + 2 <= stepcol)) { stepcol = si + 2; stepwith = ($0 ~ /^ *- with:/) }
             else if (stepcol >= 0 && si < stepcol) stepcol = -1
             else if (si == stepcol && $0 ~ /^ *with:/) stepwith = 1
-            # Only a uses: key at the step key column is a step; the same text
-            # deeper down is block scalar content (a run: | script).
+            # Only a uses: key at the step key column is a step.
             if (stepcol >= 0 && $0 ~ mise && (si == stepcol || si + 2 == stepcol && $0 ~ /^ *- /)) misestep[FNR] = stepwith
             # A value-less env: whose next line is at or above the job key
             # column is a null env (child indent falls back in pass 2); one
@@ -104,9 +107,8 @@ transform() {
             if (envci_job != "" && si > kind[envci_job]) { envci[envci_job] = si; envodd[envci_job] = ($0 !~ /^ *[<"\047A-Za-z0-9_][^:]*:([ \t]|$)/) }
             envci_job = ""
         }
-        insc = scalar($0)
         track($0)
-        if (job != "" && !insc && $0 ~ /UV_NATIVE_TLS:/) hasuv[job] = 1
+        if (job != "" && $0 ~ /UV_NATIVE_TLS:/) hasuv[job] = 1
         if (job == "" || !(job in kind) || ind($0) != kind[job]) next
         if ($0 ~ /^ *env:/) hasenv[job] = 1
         if ($0 ~ /^ *env:[ \t]*(#.*)?$/) envci_job = job
@@ -501,6 +503,26 @@ jobs:
 EOF
     run --env internal --apply "$tmp/uvtext" > /dev/null; rc=$?
     [ "$rc" -eq 0 ] && sed -n 4,5p "$tmp/uvtext/ci.yml" | tr '\n' '|' | grep -q '^    env:|      UV_NATIVE_TLS: "true"|$'; ck "UV_NATIVE_TLS text in a block scalar does not count as set"
+
+    # Issue #37: pass 1 skips every block scalar body line. A scalar opened
+    # outside any step (stepcol unset) holding step-shaped and env text.
+    mkdir "$tmp/p1skip"
+    cat > "$tmp/p1skip/ci.yml" <<'EOF'
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    if: |
+      - uses: jdx/mise-action@v2
+      UV_NATIVE_TLS: x
+    steps:
+      - uses: jdx/mise-action@v2
+EOF
+    out=$(run --env internal --apply "$tmp/p1skip"); rc=$?
+    got=$tmp/p1skip/ci.yml
+    [ "$rc" -eq 0 ] && ! printf "%s\n" "$out" | grep -q "^warn=" &&
+        sed -n 4,5p "$got" | tr '\n' '|' | grep -q '^    env:|      UV_NATIVE_TLS: "true"|$' &&
+        sed -n 7p "$got" | grep -q "^      - uses: jdx/mise-action@v2$" &&
+        [ "$(grep -c "jdx/mise-action" "$got")" -eq 1 ]; ck "pass 1 skips block scalar body lines"
 
     mkdir "$tmp/empty"
     run "$tmp/empty" > /dev/null; rc=$?
