@@ -51,9 +51,8 @@ RUNNER_EXTRA_CA=/usr/local/share/ca-certificates/<proxy-ca>.crt \
 The CA is copied into the build context and trusted with
 `update-ca-certificates`, so the runner and every job in it trust it too. The
 file is checked before the registration token is minted. The image is built
-only when its tag is absent: after a failed build without the CA there is no
-image to remove, but an image built before setting the CA must be removed
-(`ssh <host> docker rmi runner-setup-public:22.04`) to be rebuilt with it.
+only when its tag is absent, so an image built before setting the CA must be
+removed first: `ssh <host> docker rmi runner-setup-public:22.04`.
 
 ## Checks when it fails
 
