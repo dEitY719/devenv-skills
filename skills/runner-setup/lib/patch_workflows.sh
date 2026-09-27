@@ -470,14 +470,16 @@ EOF
         sed -n 4p "$got" | grep -q "^    env:$" && sed -n 5p "$got" | grep -q '^      UV_NATIVE_TLS: "true"$' &&
         ! grep -q "jdx/mise-action" "$got"; ck "block scalars end at the right line; comment after env: is not a value"
 
-    # Issue #35 shapes: a null job env: (next line at the job key column) and
-    # UV_NATIVE_TLS text inside a block scalar, one dir each.
+    # Issue #35 shapes: a null job env: (next non-blank line at the job key
+    # column, or end of file) and UV_NATIVE_TLS text inside a block scalar.
     mkdir "$tmp/nullenv" "$tmp/uvtext"
     cat > "$tmp/nullenv/ci.yml" <<'EOF'
 jobs:
   a:
     runs-on: ubuntu-latest
     env:
+
+    # comment
     steps:
       - run: make
   b:
@@ -488,7 +490,7 @@ EOF
     got=$tmp/nullenv/ci.yml
     [ "$rc" -eq 0 ] && sed -n 4,5p "$got" | tr '\n' '|' | grep -q '^    env:|      UV_NATIVE_TLS: "true"|$' &&
         sed -n '$p' "$got" | grep -q '^      UV_NATIVE_TLS: "true"$' &&
-        { ! python3 -c "import yaml" 2>/dev/null || python3 -c "import sys,yaml; d=yaml.safe_load(open(sys.argv[1])); assert d['jobs']['a']['env'] == {'UV_NATIVE_TLS': 'true'}" "$got"; }; ck "null job env: gains UV_NATIVE_TLS as its child"
+        { ! python3 -c "import yaml" 2>/dev/null || python3 -c "import sys,yaml; d=yaml.safe_load(open(sys.argv[1])); assert d['jobs']['a']['env'] == d['jobs']['b']['env'] == {'UV_NATIVE_TLS': 'true'}" "$got"; }; ck "null job env: gains UV_NATIVE_TLS as its child"
     cat > "$tmp/uvtext/ci.yml" <<'EOF'
 jobs:
   b:
