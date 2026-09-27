@@ -522,7 +522,7 @@ EOF
     [ "$rc" -eq 0 ] && ! printf "%s\n" "$out" | grep -q "^warn=" &&
         sed -n 4,5p "$got" | tr '\n' '|' | grep -q '^    env:|      UV_NATIVE_TLS: "true"|$' &&
         sed -n 7p "$got" | grep -q "^      - uses: jdx/mise-action@v2$" &&
-        [ "$(grep -c "jdx/mise-action" "$got")" -eq 1 ]; ck "pass 1 skips block scalar body lines"
+        [ "$(grep -c "jdx/mise-action" "$got")" -eq 1 ] && [ "$(grep -c "mise.run}\" | sh" "$got")" -eq 1 ]; ck "pass 1 skips block scalar body lines"
 
     mkdir "$tmp/empty"
     run "$tmp/empty" > /dev/null; rc=$?
