@@ -126,7 +126,9 @@ remote_script() {
     cat <<'REMOTE'
 set -eu
 export RUNNER_URL RUNNER_NAME RUNNER_LABELS RUNNER_DIR RUNNER_TOKEN
-if [ "$BUILD" = 1 ] && ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+# With an extra CA, always build: an image cached from before the CA was set
+# would silently lack it. Docker's layer cache keeps an unchanged CA cheap.
+if [ "$BUILD" = 1 ] && { [ -n "$EXTRA_CA" ] || ! docker image inspect "$IMAGE" >/dev/null 2>&1; }; then
     # A context dir, not a stdin Dockerfile: COPY needs one. ca/ stays empty
     # unless RUNNER_EXTRA_CA names the CA of a TLS-intercepting proxy.
     ctx=$(mktemp -d)
@@ -146,6 +148,8 @@ RUN apt-get update \
  && ./bin/installdependencies.sh \
  && rm -rf /var/lib/apt/lists/* \
  && useradd -m runner && chown -R runner /actions-runner
+# Node (JavaScript actions) ignores the OS store unless pointed at it.
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
 USER runner
 DOCKERFILE
     docker build -q -t "$IMAGE" --build-arg RUNNER_VERSION="$RUNNER_VERSION" "$ctx"
@@ -307,11 +311,15 @@ EOF
     STUB=$tmp PATH="$tmp/bin:$PATH" sh "$tmp/remote.sh" &&
         [ "$(cat "$tmp/ctx.ca")" = extra-ca.crt ] &&
         grep -q '^COPY ca/ /usr/local/share/ca-certificates/' "$tmp/Dockerfile" &&
-        grep -q 'update-ca-certificates' "$tmp/Dockerfile"
-    ck "e2e: build context carries the CA and trusts it"
-    rm -f "$tmp/ca_ok"
+        grep -q 'update-ca-certificates' "$tmp/Dockerfile" &&
+        grep -q '^ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt' "$tmp/Dockerfile"
+    ck "e2e: build context carries the CA and trusts it (OS and Node)"
+    rm -f "$tmp/noimage" "$tmp/ctx.ca"
+    STUB=$tmp PATH="$tmp/bin:$PATH" sh "$tmp/remote.sh" && [ "$(cat "$tmp/ctx.ca")" = extra-ca.crt ]
+    ck "e2e: RUNNER_EXTRA_CA rebuilds over a cached image"
+    rm -f "$tmp/ca_ok" "$tmp/ctx.ca"; : > "$tmp/noimage"
     STUB=$tmp PATH="$tmp/bin:$PATH" register --env public --host box --repo o/r > /dev/null 2>&1 &&
-        STUB=$tmp PATH="$tmp/bin:$PATH" sh "$tmp/remote.sh" && [ -z "$(cat "$tmp/ctx.ca")" ]
+        STUB=$tmp PATH="$tmp/bin:$PATH" sh "$tmp/remote.sh" && [ -f "$tmp/ctx.ca" ] && [ ! -s "$tmp/ctx.ca" ]
     ck "e2e: default build context has no extra CA"
 
     [ "$fail" -eq 0 ] && printf 'ok    register_runner.sh self-test passed\n'

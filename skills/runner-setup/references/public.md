@@ -49,10 +49,15 @@ RUNNER_EXTRA_CA=/usr/local/share/ca-certificates/<proxy-ca>.crt \
 ```
 
 The CA is copied into the build context and trusted with
-`update-ca-certificates`, so the runner and every job in it trust it too. The
-file is checked before the registration token is minted. The image is built
-only when its tag is absent, so an image built before setting the CA must be
-removed first: `ssh <host> docker rmi runner-setup-public:22.04`.
+`update-ca-certificates`; the image also sets `NODE_EXTRA_CA_CERTS` to the
+system bundle, because Node (JavaScript actions such as `actions/checkout`)
+ignores the OS store otherwise. The file is checked before the registration
+token is minted. With `RUNNER_EXTRA_CA` set the image is always rebuilt —
+Docker's layer cache makes that cheap — so an image cached from before the CA
+was set is never silently reused.
+
+The host must reach github.com directly (transparent interception). A proxy
+that also needs `http(s)_proxy` is not covered by `--env public`.
 
 ## Checks when it fails
 
