@@ -58,7 +58,10 @@ written):
 
 Handled rather than refused: a one-line flow env (`env: {A: b}`) becomes
 `env: {A: b, UV_NATIVE_TLS: "true"}`, and an existing `env:` block gains the
-key at its own child indent, whatever the file's indent width.
+key at its own child indent, whatever the file's indent width. A null job
+`env:` (no value, next line back at the job key column) gains the key as its
+child. `UV_NATIVE_TLS:` text inside a block scalar does not count as already
+set.
 
 Not changed and not reported: mise-action inputs such as `version:` or
 `install_args:` (the manual step installs the latest mise and all tools from

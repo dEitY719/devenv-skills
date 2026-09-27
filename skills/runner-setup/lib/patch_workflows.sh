@@ -65,6 +65,14 @@ transform() {
     function ind(s) { match(s, /^ */); return RLENGTH }
     function warn(why) { printf "warn=%s:%d %s\n", FILENAME, FNR, why > warnf }
     function blank(s) { return s ~ /^[ \t]*(#.*)?$/ }
+    # Block scalar content (below `key: |` / `key: >`) is text, not YAML:
+    # 1 for such a line, never scanned. Both passes track it (bsc).
+    function scalar(line, i) {
+        if (bsc >= 0 && !blank(line) && i <= bsc) bsc = -1
+        if (bsc >= 0) return 1
+        if (line ~ /(:|^ *-)[ \t]+[|>][-+0-9]*[ \t]*(#.*)?$/) bsc = i + (line ~ /^ *- / ? 2 : 0)
+        return 0
+    }
     # Track the current job for either pass. Sets job, ki (job key indent).
     function track(line,   i) {
         if (blank(line)) return
@@ -76,7 +84,7 @@ transform() {
         if (i == ji) { job = line; sub(/^ */, "", job); sub(/:.*/, "", job); want_ki = 1; return }
         if (job != "" && want_ki) { kind[job] = i; want_ki = 0 }
     }
-    FNR == 1 { injobs = 0; job = ""; want_ki = 0; stepcol = -1; envci_job = "" }
+    FNR == 1 { injobs = 0; job = ""; want_ki = 0; stepcol = -1; envci_job = ""; bsc = -1 }
     NR == FNR {
         # Step tracking: a with: key seen before uses: jdx/mise-action in the
         # same list item marks that uses: line for refusal in pass 2.
@@ -88,12 +96,16 @@ transform() {
             # Only a uses: key at the step key column is a step; the same text
             # deeper down is block scalar content (a run: | script).
             if (stepcol >= 0 && $0 ~ mise && (si == stepcol || si + 2 == stepcol && $0 ~ /^ *- /)) misestep[FNR] = stepwith
-            # A value-less env: whose next line is not a `KEY:` line is a
-            # flow mapping, alias or scalar continued below: refused in pass 2.
-            if (envci_job != "") { envci[envci_job] = si; envodd[envci_job] = ($0 !~ /^ *[<"\047A-Za-z0-9_][^:]*:([ \t]|$)/); envci_job = "" }
+            # A value-less env: whose next line is at or above the job key
+            # column is a null env (child indent falls back in pass 2); one
+            # whose next line is not a `KEY:` line is a flow mapping, alias or
+            # scalar continued below: refused in pass 2.
+            if (envci_job != "" && si > kind[envci_job]) { envci[envci_job] = si; envodd[envci_job] = ($0 !~ /^ *[<"\047A-Za-z0-9_][^:]*:([ \t]|$)/) }
+            envci_job = ""
         }
+        insc = scalar($0, ind($0))
         track($0)
-        if (job != "" && $0 ~ /UV_NATIVE_TLS:/) hasuv[job] = 1
+        if (job != "" && !insc && $0 ~ /UV_NATIVE_TLS:/) hasuv[job] = 1
         if (job == "" || !(job in kind) || ind($0) != kind[job]) next
         if ($0 ~ /^ *env:/) hasenv[job] = 1
         if ($0 ~ /^ *env:[ \t]*(#.*)?$/) envci_job = job
@@ -114,12 +126,9 @@ transform() {
             if (dropping) next
         }
 
-        # Block scalar content (below `key: |` / `key: >`) is text, not YAML:
-        # emitted as is and never scanned. Outside it, an anchor or alias is
-        # refused -- rewriting one node would silently change every alias.
-        if (bsc >= 0 && !blank(line) && i <= bsc) bsc = -1
-        if (bsc >= 0) { print line; next }
-        if (line ~ /(:|^ *-)[ \t]+[|>][-+0-9]*[ \t]*(#.*)?$/) bsc = i + (line ~ /^ *- / ? 2 : 0)
+        # Block scalar content is emitted as is. Outside it, an anchor or
+        # alias is refused -- rewriting one node would silently change every alias.
+        if (scalar(line, i)) { print line; next }
         if (!blank(line) && line ~ anchor) { warn("YAML anchor/alias; left as is"); print line; next }
 
         if (envname == "internal" && (FNR in misestep)) {
@@ -166,7 +175,7 @@ transform() {
             print kpad "env:"; print cpad "UV_NATIVE_TLS: \"true\""; hasuv[job] = 1
         }
     }
-    BEGIN { mise_col = -1; bsc = -1; anchor = "(^[ \t]*(-[ \t]+)*|:[ \t]+|[[{,][ \t]*)[&*][A-Za-z0-9_]"; ubuntu = "^ *runs-on:[ \t]*[\"\047]?ubuntu-latest[\"\047]?[ \t]*(#.*)?$"; mise = "^ *(- )?uses:[ \t]*jdx/mise-action@" }
+    BEGIN { mise_col = -1; anchor = "(^[ \t]*(-[ \t]+)*|:[ \t]+|[[{,][ \t]*)[&*][A-Za-z0-9_]"; ubuntu = "^ *runs-on:[ \t]*[\"\047]?ubuntu-latest[\"\047]?[ \t]*(#.*)?$"; mise = "^ *(- )?uses:[ \t]*jdx/mise-action@" }
     ' "$2" "$2"
 }
 
@@ -459,6 +468,36 @@ EOF
         grep -q "^          echo \*x$" "$got" && grep -q "^          a: \*b$" "$got" && grep -q "^          c: &d$" "$got" &&
         sed -n 4p "$got" | grep -q "^    env:$" && sed -n 5p "$got" | grep -q '^      UV_NATIVE_TLS: "true"$' &&
         ! grep -q "jdx/mise-action" "$got"; ck "block scalars end at the right line; comment after env: is not a value"
+
+    # Issue #35 shapes: a null job env: (next line at the job key column) and
+    # UV_NATIVE_TLS text inside a block scalar, one dir each.
+    mkdir "$tmp/nullenv" "$tmp/uvtext"
+    cat > "$tmp/nullenv/ci.yml" <<'EOF'
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    env:
+    steps:
+      - run: make
+  b:
+    runs-on: ubuntu-latest
+    env:
+EOF
+    out=$(run --env internal --apply "$tmp/nullenv"); rc=$?
+    got=$tmp/nullenv/ci.yml
+    [ "$rc" -eq 0 ] && sed -n 4,5p "$got" | tr '\n' '|' | grep -q '^    env:|      UV_NATIVE_TLS: "true"|$' &&
+        sed -n '$p' "$got" | grep -q '^      UV_NATIVE_TLS: "true"$' &&
+        { ! python3 -c "import yaml" 2>/dev/null || python3 -c "import sys,yaml; d=yaml.safe_load(open(sys.argv[1])); assert d['jobs']['a']['env'] == {'UV_NATIVE_TLS': 'true'}" "$got"; }; ck "null job env: gains UV_NATIVE_TLS as its child"
+    cat > "$tmp/uvtext/ci.yml" <<'EOF'
+jobs:
+  b:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo UV_NATIVE_TLS: x
+EOF
+    out=$(run --env internal --apply "$tmp/uvtext"); rc=$?
+    [ "$rc" -eq 0 ] && sed -n 4,5p "$tmp/uvtext/ci.yml" | tr '\n' '|' | grep -q '^    env:|      UV_NATIVE_TLS: "true"|$'; ck "UV_NATIVE_TLS text in a block scalar does not count as set"
 
     mkdir "$tmp/empty"
     run "$tmp/empty" > /dev/null; rc=$?
