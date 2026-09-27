@@ -67,7 +67,8 @@ transform() {
     function blank(s) { return s ~ /^[ \t]*(#.*)?$/ }
     # Block scalar content (below `key: |` / `key: >`) is text, not YAML:
     # 1 for such a line, never scanned. Both passes track it (bsc).
-    function scalar(line, i) {
+    function scalar(line,   i) {
+        i = ind(line)
         if (bsc >= 0 && !blank(line) && i <= bsc) bsc = -1
         if (bsc >= 0) return 1
         if (line ~ /(:|^ *-)[ \t]+[|>][-+0-9]*[ \t]*(#.*)?$/) bsc = i + (line ~ /^ *- / ? 2 : 0)
@@ -103,7 +104,7 @@ transform() {
             if (envci_job != "" && si > kind[envci_job]) { envci[envci_job] = si; envodd[envci_job] = ($0 !~ /^ *[<"\047A-Za-z0-9_][^:]*:([ \t]|$)/) }
             envci_job = ""
         }
-        insc = scalar($0, ind($0))
+        insc = scalar($0)
         track($0)
         if (job != "" && !insc && $0 ~ /UV_NATIVE_TLS:/) hasuv[job] = 1
         if (job == "" || !(job in kind) || ind($0) != kind[job]) next
@@ -128,7 +129,7 @@ transform() {
 
         # Block scalar content is emitted as is. Outside it, an anchor or
         # alias is refused -- rewriting one node would silently change every alias.
-        if (scalar(line, i)) { print line; next }
+        if (scalar(line)) { print line; next }
         if (!blank(line) && line ~ anchor) { warn("YAML anchor/alias; left as is"); print line; next }
 
         if (envname == "internal" && (FNR in misestep)) {
@@ -483,7 +484,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
 EOF
-    out=$(run --env internal --apply "$tmp/nullenv"); rc=$?
+    run --env internal --apply "$tmp/nullenv" > /dev/null; rc=$?
     got=$tmp/nullenv/ci.yml
     [ "$rc" -eq 0 ] && sed -n 4,5p "$got" | tr '\n' '|' | grep -q '^    env:|      UV_NATIVE_TLS: "true"|$' &&
         sed -n '$p' "$got" | grep -q '^      UV_NATIVE_TLS: "true"$' &&
@@ -496,7 +497,7 @@ jobs:
       - run: |
           echo UV_NATIVE_TLS: x
 EOF
-    out=$(run --env internal --apply "$tmp/uvtext"); rc=$?
+    run --env internal --apply "$tmp/uvtext" > /dev/null; rc=$?
     [ "$rc" -eq 0 ] && sed -n 4,5p "$tmp/uvtext/ci.yml" | tr '\n' '|' | grep -q '^    env:|      UV_NATIVE_TLS: "true"|$'; ck "UV_NATIVE_TLS text in a block scalar does not count as set"
 
     mkdir "$tmp/empty"
