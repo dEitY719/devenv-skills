@@ -58,6 +58,7 @@ to be edited into the scripts:
 | `RUNNER_NO_PROXY` | `localhost,127.0.0.1,<ghes host>,.<ghes parent domain>` | internal: `no_proxy` in the container |
 | `RUNNER_PUBLIC_IMAGE` | `runner-setup-public:22.04` | public: image tag built on the host |
 | `RUNNER_VERSION` | `2.328.0` | public image build (and any image without a runner) |
+| `RUNNER_EXTRA_CA` | unset | public: CA file **on the runner host** baked into the built image — a TLS-intercepting proxy's CA (`references/public.md`) |
 | `RUNNER_DIR` | `/actions-runner` | runner install dir inside the image |
 | `RUNNER_VERIFY_TIMEOUT` | `90` | seconds to wait for `online` |
 

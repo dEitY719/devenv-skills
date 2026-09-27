@@ -30,6 +30,8 @@
 #   RUNNER_NO_PROXY        internal no_proxy            (localhost,127.0.0.1,<ghes>,.<ghes parent domain>)
 #   RUNNER_PUBLIC_IMAGE    public image tag             (runner-setup-public:22.04)
 #   RUNNER_VERSION         actions/runner release       (2.328.0)
+#   RUNNER_EXTRA_CA        public: CA file on the runner host baked into the
+#                          built image, for TLS-intercepting proxies (unset)
 #   RUNNER_DIR             runner dir inside image      (/actions-runner)
 #   RUNNER_VERIFY_TIMEOUT  seconds to wait for online   (90)
 #
@@ -75,7 +77,7 @@ resolve() {
             API_HOST=${RUNNER_GHES_HOST:-github.samsungds.net}
             HOST=${HOST:-${RUNNER_INTERNAL_HOST:-ssai-ops}}
             IMAGE=${RUNNER_INTERNAL_IMAGE:-skills_runner:26.09}
-            BUILD=0
+            BUILD=0 EXTRA_CA=''
             PROXY=${RUNNER_PROXY:-http://12.26.204.100:8080}
             NO_PROXY_V=${RUNNER_NO_PROXY:-localhost,127.0.0.1,$API_HOST,.${API_HOST#*.}}
             ;;
@@ -84,6 +86,7 @@ resolve() {
             [ -n "$HOST" ] || { err "--host is required with --env public"; return 2; }
             IMAGE=${RUNNER_PUBLIC_IMAGE:-runner-setup-public:22.04}
             BUILD=1 PROXY='' NO_PROXY_V=''
+            EXTRA_CA=${RUNNER_EXTRA_CA:-}
             ;;
         *) err "--env must be internal or public (got '$ENV')"; return 2 ;;
     esac
@@ -106,6 +109,7 @@ facts() {
     say "env=$ENV" "repo=$REPO" "api_host=$API_HOST" "host=$HOST" "label=$LABEL" \
         "container=$CONTAINER" "image=$IMAGE" "build_image=$BUILD" "runner_url=$URL"
     [ -n "$PROXY" ] && say "proxy=$PROXY" "no_proxy=$NO_PROXY_V"
+    [ -n "$EXTRA_CA" ] && say "extra_ca=$EXTRA_CA"
     if [ -n "$REMOTE_HOST" ] && [ "$REMOTE_HOST" != "$API_HOST" ]; then
         say "warn=origin host $REMOTE_HOST differs from api_host $API_HOST (wrong --env?)"
     fi
@@ -118,17 +122,25 @@ remote_script() {
         "$(q "$IMAGE")" "$(q "$CONTAINER")" "$BUILD" "$(q "${RUNNER_VERSION:-2.328.0}")"
     printf 'RUNNER_URL=%s RUNNER_NAME=%s RUNNER_LABELS=%s RUNNER_DIR=%s RUNNER_TOKEN=%s\n' \
         "$(q "$URL")" "$(q "$CONTAINER")" "$(q "$LABEL")" "$(q "${RUNNER_DIR:-/actions-runner}")" "$(q "$1")"
-    printf 'PROXY=%s NO_PROXY_V=%s\n' "$(q "$PROXY")" "$(q "$NO_PROXY_V")"
+    printf 'PROXY=%s NO_PROXY_V=%s EXTRA_CA=%s\n' "$(q "$PROXY")" "$(q "$NO_PROXY_V")" "$(q "$EXTRA_CA")"
     cat <<'REMOTE'
 set -eu
 export RUNNER_URL RUNNER_NAME RUNNER_LABELS RUNNER_DIR RUNNER_TOKEN
 if [ "$BUILD" = 1 ] && ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
-    docker build -q -t "$IMAGE" --build-arg RUNNER_VERSION="$RUNNER_VERSION" - <<'DOCKERFILE'
+    # A context dir, not a stdin Dockerfile: COPY needs one. ca/ stays empty
+    # unless RUNNER_EXTRA_CA names the CA of a TLS-intercepting proxy.
+    ctx=$(mktemp -d)
+    trap 'rm -rf "$ctx"' EXIT
+    mkdir "$ctx/ca"
+    [ -z "$EXTRA_CA" ] || cp "$EXTRA_CA" "$ctx/ca/extra-ca.crt"
+    cat > "$ctx/Dockerfile" <<'DOCKERFILE'
 FROM ubuntu:22.04
 ARG RUNNER_VERSION
 ENV DEBIAN_FRONTEND=noninteractive
+COPY ca/ /usr/local/share/ca-certificates/
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl git \
+ && update-ca-certificates \
  && mkdir /actions-runner && cd /actions-runner \
  && curl -fsSL "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz" | tar xz \
  && ./bin/installdependencies.sh \
@@ -136,6 +148,7 @@ RUN apt-get update \
  && useradd -m runner && chown -R runner /actions-runner
 USER runner
 DOCKERFILE
+    docker build -q -t "$IMAGE" --build-arg RUNNER_VERSION="$RUNNER_VERSION" "$ctx"
 fi
 set -- -e RUNNER_URL -e RUNNER_NAME -e RUNNER_LABELS -e RUNNER_DIR -e RUNNER_TOKEN
 # The public image runs as its own `runner` user; only the reused internal
@@ -175,6 +188,11 @@ register() {
     if printf '%s\n' "$names" | grep -qx "$CONTAINER"; then
         err "container $CONTAINER already exists on $HOST -- remove it first: ssh $HOST docker rm -f $CONTAINER"
         return 3
+    fi
+    # Checked before the token is minted, like the duplicate check above.
+    if [ -n "$EXTRA_CA" ] && ! ssh -o BatchMode=yes "$HOST" "test -r $(q "$EXTRA_CA")"; then
+        err "RUNNER_EXTRA_CA $EXTRA_CA is not a readable file on $HOST"
+        return 1
     fi
 
     say "[..] step 3: registration token from $API_HOST"
@@ -238,11 +256,13 @@ self_test() {
 printf '%s\n' "$*" >> "$STUB/ssh.argv"
 case "$*" in
     *"docker ps"*) cat "$STUB/names" 2>/dev/null || true ;;
+    *"test -r"*) [ -f "$STUB/ca_ok" ] ;;
     *"sh -s") cat > "$STUB/remote.sh" ;;
 esac
 EOF
     cat > "$tmp/bin/gh" <<'EOF'
 #!/bin/sh
+printf '%s\n' "$*" >> "$STUB/gh.argv"
 case "$*" in
     *registration-token*) echo SECRET-TKN ;;
     *runners*) echo "online self-hosted,Linux,X64,r-build" ;;
@@ -256,6 +276,11 @@ EOF
     cat > "$tmp/bin/docker" <<'EOF'
 #!/bin/sh
 printf '%s\n' "$*" >> "$STUB/docker.argv"
+case "$1" in
+    image) [ ! -f "$STUB/noimage" ]; exit ;;
+    build) for a; do ctx=$a; done
+        ls "$ctx/ca" > "$STUB/ctx.ca"; cp "$ctx/Dockerfile" "$STUB/Dockerfile" ;;
+esac
 EOF
     chmod +x "$tmp/bin/docker"
     STUB=$tmp PATH="$tmp/bin:$PATH" sh "$tmp/remote.sh" &&
@@ -264,6 +289,30 @@ EOF
     printf 'other\nr-runner\n' > "$tmp/names"
     STUB=$tmp PATH="$tmp/bin:$PATH" register --env public --host box --repo o/r > /dev/null 2>&1; [ $? -eq 3 ]
     ck "e2e: existing container refused with exit 3"
+
+    # RUNNER_EXTRA_CA: a proxy CA baked into the public image (#39).
+    out=$(RUNNER_EXTRA_CA=/ca.crt register --plan --env public --host box --repo o/r 2>&1)
+    printf '%s\n' "$out" | grep -qx 'extra_ca=/ca.crt'; ck "plan: public shows extra_ca"
+    out=$(RUNNER_EXTRA_CA=/ca.crt register --plan --repo o/r 2>&1)
+    ! printf '%s\n' "$out" | grep -q '^extra_ca='; ck "plan: internal ignores RUNNER_EXTRA_CA"
+    rm -f "$tmp/names" "$tmp/gh.argv"
+    STUB=$tmp PATH="$tmp/bin:$PATH" RUNNER_EXTRA_CA=/missing.crt \
+        register --env public --host box --repo o/r > /dev/null 2>&1; [ $? -eq 1 ] &&
+        ! grep -q registration-token "$tmp/gh.argv" 2>/dev/null
+    ck "e2e: unreadable RUNNER_EXTRA_CA fails before the token"
+    printf 'CERT\n' > "$tmp/ca.crt"; : > "$tmp/ca_ok"
+    STUB=$tmp PATH="$tmp/bin:$PATH" RUNNER_EXTRA_CA=$tmp/ca.crt \
+        register --env public --host box --repo o/r > /dev/null 2>&1; ck "e2e: registers with RUNNER_EXTRA_CA"
+    : > "$tmp/noimage"
+    STUB=$tmp PATH="$tmp/bin:$PATH" sh "$tmp/remote.sh" &&
+        [ "$(cat "$tmp/ctx.ca")" = extra-ca.crt ] &&
+        grep -q '^COPY ca/ /usr/local/share/ca-certificates/' "$tmp/Dockerfile" &&
+        grep -q 'update-ca-certificates' "$tmp/Dockerfile"
+    ck "e2e: build context carries the CA and trusts it"
+    rm -f "$tmp/ca_ok"
+    STUB=$tmp PATH="$tmp/bin:$PATH" register --env public --host box --repo o/r > /dev/null 2>&1 &&
+        STUB=$tmp PATH="$tmp/bin:$PATH" sh "$tmp/remote.sh" && [ -z "$(cat "$tmp/ctx.ca")" ]
+    ck "e2e: default build context has no extra CA"
 
     [ "$fail" -eq 0 ] && printf 'ok    register_runner.sh self-test passed\n'
     return "$fail"
