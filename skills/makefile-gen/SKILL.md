@@ -11,7 +11,7 @@ compatibility:
   network: none
 metadata:
   model_recommendation:
-    tier: sonnet
+    tier: haiku
     reason: "Deterministic detect + render scripts; the model only routes flags and reports"
     claude: prefer
     non_claude: advisory-only
@@ -73,20 +73,12 @@ End with `Plan ready: <path> (targets=<n>, skipped=<m>)` and
 
 ## Step 4: Apply (only if `--apply`)
 
-Stop at the first failure with `[FAIL] devenv:makefile-gen <reason>` + exit 1:
-
-1. `makefile=present` without `--force` → refuse; write nothing. The skill
-   never merges (`references/constraints.md`): it copies the region below
-   the custom sentinel over, and each `warn=` names a target that has none.
-2. Render into a **temp file** — a redirect over `<path>/Makefile` truncates
-   that region away — and `sh <skill-dir>/lib/render.sh --check <tmp>`; a
-   failure means the renderer broke its own contract: report it, write nothing.
-3. With `--force` and an existing Makefile, `cp Makefile Makefile.bak`.
-4. Copy the temp file to `<path>/Makefile`.
-5. Verify: `sh <skill-dir>/lib/render.sh --verify <path>` runs `make` (help must list every
-   `.PHONY` target) and `make -n <t>` for each. It never runs `run`, `stop`,
-   `build` for real. On failure, restore `Makefile.bak` (or delete the new
-   Makefile if none existed) and report the failing targets.
+`sh <skill-dir>/lib/render.sh --apply <path> [--force] [--port N] [--lang ko|en]`
+owns the write: it refuses an existing Makefile without `--force` (never
+merges, `references/constraints.md`), renders to a temp file + `--check`,
+keeps `Makefile.bak`, copies in, runs `--verify` (`make` + `make -n` only) and
+restores the original on failure. Its last line is `[OK] devenv:makefile-gen
+<path>/Makefile` or `[FAIL] devenv:makefile-gen <reason>` (exit 1): relay it.
 
 ## Step 5: Report
 

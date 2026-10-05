@@ -11,6 +11,7 @@ cd "$(dirname "$0")/.."
 CHECKS=(
     skills/mise-migrate/lib/detect_project.sh
     skills/mise-migrate/lib/stale_scan.sh
+    skills/mise-migrate/lib/cleanup.sh
     skills/symlink-manager/lib/symlink_migrate.sh
     skills/makefile-gen/lib/detect.sh
     skills/makefile-gen/lib/render.sh
