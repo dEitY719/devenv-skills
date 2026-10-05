@@ -9,7 +9,8 @@
 #
 # stdout: `removed: <dir>` per deleted directory. `--keep-venv` leaves
 # `.venv/` alone (egg-info is still removed). A `.venv` whose `pyvenv.cfg`
-# has a `uv = ` key is the env `uv sync` just built at the same path: it is
+# has a `uv = ` key, or with any site-packages `*.dist-info/INSTALLER` of
+# `uv`, is the env `uv sync` just built or reused at the same path: it is
 # kept and reported as `kept: <path>/.venv (uv-managed)`. Every target is
 # resolved with `cd -P` and must sit strictly inside <path>'s own resolved
 # directory -- a `.venv` symlink pointing elsewhere is refused, never
@@ -31,6 +32,13 @@ usage() { sed -n '6,8p' "$0" | sed 's/^# \{0,1\}//'; }
 # real <dir>: physical path, symlinks resolved; empty if unresolvable.
 real() { (cd -P -- "$1" 2>/dev/null && pwd); }
 
+# uv_managed <venv>: `uv sync` built it (pyvenv.cfg `uv = ` key) or reused it
+# in place (a site-packages dist-info whose INSTALLER is `uv`).
+uv_managed() {
+    grep -q '^uv *= ' "$1/pyvenv.cfg" 2>/dev/null ||
+        grep -qx uv "$1"/lib/python*/site-packages/*.dist-info/INSTALLER 2>/dev/null
+}
+
 main() {
     p=""; keep=0
     for a in "$@"; do
@@ -47,7 +55,7 @@ main() {
     list=""
     kept=""
     if [ "$keep" -eq 1 ]; then :
-    elif grep -q '^uv *= ' "$p/.venv/pyvenv.cfg" 2>/dev/null; then kept="kept: $p/.venv (uv-managed)"
+    elif uv_managed "$p/.venv"; then kept="kept: $p/.venv (uv-managed)"
     elif [ -e "$p/.venv" ] || [ -L "$p/.venv" ]; then list="$p/.venv$NL"; fi
     list="$list$(find "$p" -maxdepth 2 \( -name .venv -o -name .git \) -prune -o -type d -name '*.egg-info' -print)"
     _o=$IFS; IFS=$NL
@@ -96,6 +104,18 @@ self_test() {
     mkdir -p "$d/.venv"; printf 'home = /usr/bin\nversion = 3.13.5\n' >"$d/.venv/pyvenv.cfg"
     o=$(main "$d") && [ ! -e "$d/.venv" ] && [ "$o" = "removed: $d/.venv" ] \
         && ok "pyvenv.cfg without uv key -> .venv removed" || ko "legacy .venv: $o"
+
+    # `uv sync` reuses a same-version legacy venv without adding the `uv = `
+    # key; a dist-info INSTALLER of `uv` is its proof that it synced there.
+    sp=$d/.venv/lib/python3.13/site-packages
+    mkdir -p "$sp/six-1.17.0.dist-info" "$sp/pip-25.1.1.dist-info"
+    printf 'home = /usr/bin\nversion = 3.13.5\n' >"$d/.venv/pyvenv.cfg"
+    echo pip >"$sp/pip-25.1.1.dist-info/INSTALLER"; echo uv >"$sp/six-1.17.0.dist-info/INSTALLER"
+    o=$(main "$d") && [ -d "$sp" ] && [ "$o" = "kept: $d/.venv (uv-managed)" ] \
+        && ok "reused legacy .venv with a uv INSTALLER kept, prints kept:" || ko "reused .venv: $o"
+    rm -rf "$sp/six-1.17.0.dist-info"
+    o=$(main "$d") && [ ! -e "$d/.venv" ] && [ "$o" = "removed: $d/.venv" ] \
+        && ok "legacy .venv with only pip INSTALLERs -> removed" || ko "pip-only .venv: $o"
 
     # A .venv symlink pointing outside <path> is refused, and the refusal
     # comes before any delete: the egg-info next to it survives too.

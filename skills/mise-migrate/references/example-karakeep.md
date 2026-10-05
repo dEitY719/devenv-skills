@@ -72,13 +72,16 @@ to [dependency-groups].dev to enable)`.
 ## Cleanup list (`--apply`, no `--keep-venv`)
 
 ```
-remove: .venv/                    (unless pyvenv.cfg has `uv = ` after uv sync)
+remove: .venv/                    (unless uv-managed after uv sync)
 remove: karakeep_sync.egg-info/
 ```
 
-The `.venv` here is pyenv-built, so its `pyvenv.cfg` has no `uv = ` key.
-Had `uv sync` rebuilt it, cleanup would print
-`kept: <path>/.venv (uv-managed)` instead and delete only the egg-info.
+The `.venv` here is pyenv-built (3.13.5), so its `pyvenv.cfg` has no
+`uv = ` key. With the same Python version `uv sync` reuses it in place and
+still adds no key, but the packages it installs carry a dist-info
+`INSTALLER` of `uv`, so cleanup prints `kept: <path>/.venv (uv-managed)`
+and deletes only the egg-info. The `.venv` is removed only if no package
+in it was installed by uv.
 
 ## Stale references (read-only scan)
 
