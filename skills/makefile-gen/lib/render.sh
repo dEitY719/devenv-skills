@@ -454,7 +454,8 @@ apply() {
     while [ $# -gt 0 ]; do
         case "$1" in
             --force) _f=1 ;;
-            --port|--lang) _args="$_args $1 ${2:-}"; shift ;;
+            --port|--lang) [ $# -ge 2 ] || { echo "[FAIL] devenv:makefile-gen $1 needs a value"; return 1; }
+                _args="$_args $1 $2"; shift ;;
             *) _p=$1 ;;
         esac
         shift
@@ -482,8 +483,8 @@ main() {
     p=""; LANG_=""; OPORT=""; mode="make"
     while [ $# -gt 0 ]; do
         case "$1" in
-            --port) OPORT=${2:-}; shift ;;
-            --lang) LANG_=${2:-}; shift ;;
+            --port|--lang) [ $# -ge 2 ] || { echo "render.sh: $1 needs a value" >&2; return 2; }
+                if [ "$1" = --port ]; then OPORT=$2; else LANG_=$2; fi; shift ;;
             --report) mode=report ;;
             *) p=$1 ;;
         esac
@@ -704,6 +705,15 @@ self_test() {
     [ "$rc" = 1 ] && cmp -s "$w/Makefile" "$w/orig" && [ ! -e "$w/Makefile.bak" ] \
         && printf '%s\n' "$o" | tail -n1 | grep -q '^\[FAIL\] devenv:makefile-gen ' \
         && ok "--apply over an existing Makefile without --force -> exit 1, file unchanged" || ko "apply no-force: rc=$rc $o"
+    # A trailing --port/--lang with no value: a bare second shift would kill
+    # dash outright (#44), so each runs in a subshell and must exit cleanly.
+    o=$( (main "$w" --port) 2>&1); rc=$?
+    [ "$rc" = 2 ] && [ "$o" = "render.sh: --port needs a value" ] \
+        && ok "main <dir> --port -> exit 2, needs a value" || ko "main trailing --port: rc=$rc $o"
+    o=$( (apply "$w" --force --port) 2>&1); rc=$?
+    [ "$rc" = 1 ] && cmp -s "$w/Makefile" "$w/orig" \
+        && [ "$(printf '%s\n' "$o" | tail -n1)" = "[FAIL] devenv:makefile-gen --port needs a value" ] \
+        && ok "apply <dir> --port -> [FAIL] last line, exit 1" || ko "apply trailing --port: rc=$rc $o"
     if [ "$hasmake" -eq 1 ]; then
         o=$(apply "$w" --force) && cmp -s "$w/Makefile.bak" "$w/orig" && check "$w/Makefile" >/dev/null \
             && [ "$(printf '%s\n' "$o" | tail -n1)" = "[OK] devenv:makefile-gen $w/Makefile" ] \
