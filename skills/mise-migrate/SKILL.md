@@ -84,8 +84,9 @@ In order, stopping on first failure with `[FAIL] devenv:mise-migrate
 2. Rewrite `pyproject.toml` in place (backend, packages, dep-groups).
 3. Run `uv sync` to materialize the uv-managed venv + lockfile.
 4. Cleanup — `sh <skill-dir>/lib/cleanup.sh <path> [--keep-venv]` prints
-   each `removed:` dir and refuses (exit 1, nothing deleted) any target that
-   resolves outside `<path>`. Guardrails: `references/constraints.md`.
+   each `removed:` dir, keeps a uv-managed `.venv` (`kept:`), and refuses
+   (exit 1, nothing deleted) any target outside `<path>`. Guardrails:
+   `references/constraints.md`.
 5. Stale docs — **only if `--update-docs`**, rewrite the non-excluded
    stale hits and re-print touched files (`references/stale-scan.md`).
    The PEP 735 `[WARN]` still fires (external CI is out of reach).

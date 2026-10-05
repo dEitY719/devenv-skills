@@ -8,8 +8,10 @@
 #   cleanup.sh --self-test
 #
 # stdout: `removed: <dir>` per deleted directory. `--keep-venv` leaves
-# `.venv/` alone (egg-info is still removed). Every target is resolved with
-# `cd -P` and must sit strictly inside <path>'s own resolved directory -- a
+# `.venv/` alone (egg-info is still removed). A `.venv` whose `pyvenv.cfg`
+# has a `uv = ` key is the env `uv sync` just built at the same path: it is
+# kept and reported as `kept: <path>/.venv (uv-managed)`. Every target is
+# resolved with `cd -P` and must sit strictly inside <path>'s own resolved directory -- a
 # `.venv` symlink pointing elsewhere is refused, never followed. All targets
 # are checked before the first delete, so a refusal deletes nothing.
 #
@@ -42,7 +44,10 @@ main() {
     [ -n "$root" ] || { echo "cleanup.sh: not a directory: $p" >&2; return 2; }
     # ponytail: newline-separated list, a path containing a newline is split.
     list=""
-    if [ "$keep" -eq 0 ] && { [ -e "$p/.venv" ] || [ -L "$p/.venv" ]; }; then list="$p/.venv$NL"; fi
+    kept=""
+    if [ "$keep" -eq 1 ]; then :
+    elif grep -q '^uv *= ' "$p/.venv/pyvenv.cfg" 2>/dev/null; then kept="kept: $p/.venv (uv-managed)"
+    elif [ -e "$p/.venv" ] || [ -L "$p/.venv" ]; then list="$p/.venv$NL"; fi
     list="$list$(find "$p" -maxdepth 2 \( -name .venv -o -name .git \) -prune -o -type d -name '*.egg-info' -print)"
     _o=$IFS; IFS=$NL
     for t in $list; do
@@ -57,6 +62,7 @@ main() {
         echo "removed: $t"
     done
     IFS=$_o
+    [ -z "$kept" ] || echo "$kept"
     return 0
 }
 
@@ -78,6 +84,17 @@ self_test() {
 
     rm -rf "$d/.venv"
     o=$(main "$d") && [ -z "$o" ] && ok "nothing to remove -> exit 0, no output" || ko "empty cleanup: $o"
+
+    # The .venv `uv sync` (Step 4.3) just built sits at the same path as the
+    # legacy one: a pyvenv.cfg `uv = ` key marks it uv-managed, so it stays.
+    mkdir -p "$d/.venv" "$d/foo.egg-info"
+    printf 'home = /usr/bin\nimplementation = CPython\nuv = 0.4.18\n' >"$d/.venv/pyvenv.cfg"
+    o=$(main "$d") && [ -f "$d/.venv/pyvenv.cfg" ] && [ ! -e "$d/foo.egg-info" ] \
+        && printf '%s\n' "$o" | grep -qxF "kept: $d/.venv (uv-managed)" \
+        && ok "uv-managed .venv (pyvenv.cfg uv key) kept, prints kept:" || ko "uv .venv: $o"
+    mkdir -p "$d/.venv"; printf 'home = /usr/bin\nversion = 3.13.5\n' >"$d/.venv/pyvenv.cfg"
+    o=$(main "$d") && [ ! -e "$d/.venv" ] && [ "$o" = "removed: $d/.venv" ] \
+        && ok "pyvenv.cfg without uv key -> .venv removed" || ko "legacy .venv: $o"
 
     # A .venv symlink pointing outside <path> is refused, and the refusal
     # comes before any delete: the egg-info next to it survives too.

@@ -72,9 +72,13 @@ to [dependency-groups].dev to enable)`.
 ## Cleanup list (`--apply`, no `--keep-venv`)
 
 ```
-remove: .venv/
+remove: .venv/                    (unless pyvenv.cfg has `uv = ` after uv sync)
 remove: karakeep_sync.egg-info/
 ```
+
+The `.venv` here is pyenv-built, so its `pyvenv.cfg` has no `uv = ` key.
+Had `uv sync` rebuilt it, cleanup would print
+`kept: <path>/.venv (uv-managed)` instead and delete only the egg-info.
 
 ## Stale references (read-only scan)
 
