@@ -11,9 +11,10 @@
 # `.venv/` alone (egg-info is still removed). A `.venv` whose `pyvenv.cfg`
 # has a `uv = ` key is the env `uv sync` just built at the same path: it is
 # kept and reported as `kept: <path>/.venv (uv-managed)`. Every target is
-# resolved with `cd -P` and must sit strictly inside <path>'s own resolved directory -- a
-# `.venv` symlink pointing elsewhere is refused, never followed. All targets
-# are checked before the first delete, so a refusal deletes nothing.
+# resolved with `cd -P` and must sit strictly inside <path>'s own resolved
+# directory -- a `.venv` symlink pointing elsewhere is refused, never
+# followed. All targets are checked before the first delete, so a refusal
+# deletes nothing.
 #
 # exit 0  done (nothing to remove is also done)
 # exit 1  a target resolves outside <path>, or rm failed (stops there, no
