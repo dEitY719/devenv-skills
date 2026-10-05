@@ -1,5 +1,6 @@
 ---
 name: runner-setup
+# Check 16: 285 chars on purpose — bilingual triggers + GHES/GitHub.com scope + the --apply safety note
 description: >-
   Register a Docker-container self-hosted GitHub Actions runner for a repo
   (GHES or GitHub.com) and move its workflows onto it. Use for

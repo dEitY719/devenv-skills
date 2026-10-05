@@ -7,8 +7,10 @@
 #   render.sh <path> ... --report                 print target sources + skips
 #   render.sh --check <Makefile>                  static contract check
 #   render.sh --verify <dir>                      `make` + `make -n <t>` for all
+#   render.sh --apply <path> [--force] [--port N] [--lang ko|en]   Step 4 write
 #   render.sh --self-test
 #
+# --apply is the only mode that writes, and only <path>/Makefile (+ .bak).
 # Rendering and --check never write; --verify runs make in dry-run (-n) mode
 # only, apart from `make` itself, which runs the side-effect-free help target.
 # The generated text ends with the custom sentinel; whatever <path>/Makefile
@@ -24,7 +26,7 @@ NL='
 # across a regeneration as-is: never read, checked, merged or reordered.
 SENTINEL='# --- custom (kept by makefile-gen) ---'
 
-usage() { sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; }
 
 # gen_part / keep_region <makefile>: the two halves, split at the sentinel.
 gen_part() { awk -v s="$SENTINEL" '$0 == s {exit} {print}' "$1"; }
@@ -442,6 +444,39 @@ verify() { # <dir>: help lists every .PHONY target; make -n passes for each
     return "$bad"
 }
 
+# ---------------------------------------------------------------- apply ------
+# Step 4: refuse an existing Makefile without --force; render to a temp file
+# (a redirect over <path>/Makefile would truncate the custom region before
+# main reads it) and --check it; back up to Makefile.bak; copy in; --verify;
+# on a verify failure put the original back (or remove the new file).
+apply() {
+    _p=""; _f=0; _args=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --force) _f=1 ;;
+            --port|--lang) _args="$_args $1 ${2:-}"; shift ;;
+            *) _p=$1 ;;
+        esac
+        shift
+    done
+    fail() { echo "[FAIL] devenv:makefile-gen $1"; return 1; }
+    [ -n "$_p" ] && [ -d "$_p" ] || { fail "not a directory: ${_p:-<none>}"; return 1; }
+    _mk=$_p/Makefile; _old=0; [ -f "$_mk" ] && _old=1
+    [ "$_old" -eq 1 ] && [ "$_f" -eq 0 ] && { fail "$_mk exists; --apply --force replaces it (keeps Makefile.bak)"; return 1; }
+    _tmp=$(mktemp) || { fail "mktemp failed"; return 1; }
+    # shellcheck disable=SC2086 # _args is flag/value pairs, split on purpose
+    main "$_p" $_args > "$_tmp" || { rm -f "$_tmp"; fail "render failed"; return 1; }
+    check "$_tmp" || { rm -f "$_tmp"; fail "rendered Makefile fails --check (renderer bug); nothing written"; return 1; }
+    if [ "$_old" -eq 1 ]; then cp "$_mk" "$_mk.bak" || { rm -f "$_tmp"; fail "backup to $_mk.bak failed"; return 1; }; fi
+    cp "$_tmp" "$_mk" || { rm -f "$_tmp"; fail "write $_mk failed"; return 1; }
+    rm -f "$_tmp"
+    if ! verify "$_p"; then
+        if [ "$_old" -eq 1 ]; then mv "$_mk.bak" "$_mk"; _r="original restored"; else rm -f "$_mk"; _r="new Makefile removed"; fi
+        fail "verify failed; $_r"; return 1
+    fi
+    echo "[OK] devenv:makefile-gen $_mk"
+}
+
 # ---------------------------------------------------------------- main -------
 main() {
     p=""; LANG_=""; OPORT=""; mode="make"
@@ -662,6 +697,31 @@ self_test() {
         o=$(make --no-print-directory -C "$e" build 2>&1) && [ "$o" = "no build step" ] && ok "no-stack make build -> exit 0" || ko "no-stack build: $o"
     else printf 'skip  make not on PATH -- verify cases not run\n'; fi
 
+    # --apply: Step 4's safety contract.
+    w=$tmp/apply; mkdir -p "$w"; printf '[tasks.build]\nrun="x"\n' > "$w/mise.toml"
+    printf 'mine:\n%secho hi\n' "$TAB" > "$w/Makefile"; cp "$w/Makefile" "$w/orig"
+    o=$(apply "$w"); rc=$?
+    [ "$rc" = 1 ] && cmp -s "$w/Makefile" "$w/orig" && [ ! -e "$w/Makefile.bak" ] \
+        && printf '%s\n' "$o" | tail -n1 | grep -q '^\[FAIL\] devenv:makefile-gen ' \
+        && ok "--apply over an existing Makefile without --force -> exit 1, file unchanged" || ko "apply no-force: rc=$rc $o"
+    if [ "$hasmake" -eq 1 ]; then
+        o=$(apply "$w" --force) && cmp -s "$w/Makefile.bak" "$w/orig" && check "$w/Makefile" >/dev/null \
+            && [ "$(printf '%s\n' "$o" | tail -n1)" = "[OK] devenv:makefile-gen $w/Makefile" ] \
+            && ok "--apply --force writes the Makefile and keeps Makefile.bak" || ko "apply --force: $o"
+        n=$tmp/fresh; mkdir -p "$n"
+        o=$(apply "$n" --lang en) && check "$n/Makefile" >/dev/null && [ ! -e "$n/Makefile.bak" ] \
+            && ok "--apply on a Makefile-less dir writes one, no .bak" || ko "apply fresh: $o"
+        # A kept custom region that make cannot parse: --check passes (it
+        # judges only the generated part), --verify fails -> original back.
+        # The original differs from what a regeneration renders, so a missing
+        # restore cannot hide behind an idempotent render.
+        printf 'mine:\n%secho hi\n%s\nthis is not make syntax\n' "$TAB" "$SENTINEL" > "$w/Makefile"; cp "$w/Makefile" "$w/orig"
+        o=$(apply "$w" --force); rc=$?
+        [ "$rc" = 1 ] && cmp -s "$w/Makefile" "$w/orig" \
+            && printf '%s\n' "$o" | tail -n1 | grep -qF 'verify failed; original restored' \
+            && ok "--apply verify failure restores the original Makefile" || ko "apply verify-restore: rc=$rc $o"
+    else printf 'skip  make not on PATH -- --apply write cases not run\n'; fi
+
     [ "$fail" -eq 0 ] && printf 'ok    render.sh self-test passed\n'
     return "$fail"
 }
@@ -671,6 +731,7 @@ case "${1:-}" in
     --self-test) self_test; exit $? ;;
     --check) check "${2:-}"; exit $? ;;
     --verify) verify "${2:-.}"; exit $? ;;
+    --apply) shift; apply "$@"; exit $? ;;
     "") usage >&2; exit 2 ;;
 esac
 main "$@"
