@@ -13,8 +13,11 @@
   env is `<path>/.venv` too, so the old and new env share one path: a
   `.venv` whose `pyvenv.cfg` has a `uv = ` key is the one `uv sync` just
   built, and it is kept (`kept: <path>/.venv (uv-managed)`), never
-  deleted. A legacy venv that `uv sync` reused in place carries no such
-  key and is still removed; the next `uv sync` / `uv run` recreates it.
+  deleted. A same-version legacy venv that `uv sync` reused in place gets
+  no such key, but the packages it installed carry a
+  `lib/python*/site-packages/*.dist-info/INSTALLER` of `uv`; any one of
+  those also marks it uv-managed and kept. A legacy venv with no
+  uv-installed package (every `INSTALLER` is `pip` or similar) is removed.
   `*.egg-info/` is always removed, and any target resolving outside
   `<path>` is refused. The exact paths to be removed are listed in the
   dry-run plan first.
