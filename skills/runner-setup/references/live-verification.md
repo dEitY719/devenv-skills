@@ -12,7 +12,7 @@ the same PR that flips the status line.
 ## Verification goal
 
 - **internal**: `/devenv:runner-setup` (defaults) prints
-  `[OK] devenv:runner-setup ... runner=<repo>-runner ... status=online`, and
+  `status=online` then `[OK] devenv:runner-setup runner <repo>-runner online on ...`, and
   `GH_HOST=github.samsungds.net gh api repos/<o>/<n>/actions/runners` shows
   `status=online` with `<repo>-build` among the labels.
 - **public**: `--env public --host <alias>` gives the same result, the host
@@ -62,9 +62,9 @@ On failure: `ssh <host> docker logs <repo>-runner`. Undo steps: `references/help
 
 | Check | Pass | Fail |
 |-------|------|------|
-| register (internal) | exit 0, `status=online` line printed | exit 1 with `[FAIL]` |
+| register (internal) | exit 0, `status=online` and `[OK]` lines printed | exit 1 with `[FAIL]` |
 | runners API (internal) | `status=online`, labels include `<repo>-build` | runner absent or `offline` |
-| register (public) | exit 0, `status=online` line printed | exit 1 with `[FAIL]` |
+| register (public) | exit 0, `status=online` and `[OK]` lines printed | exit 1 with `[FAIL]` |
 | public image + user | `runner-setup-public:22.04` exists; `id -un` is `runner` | image missing or user `root` |
 | workflow CI | pushed run picks the self-hosted runner and goes green, mise step included | job queued forever or mise step fails |
 | restart | `online` again after `docker restart` without re-running `config.sh` | stays `offline` or re-registers |
