@@ -69,3 +69,9 @@ ssh <host> docker rm -f <repo-name>-runner
 gh api -X DELETE repos/<owner>/<name>/actions/runners/<id>   # GH_HOST=<ghes host> on internal
 git checkout -- .github/workflows                            # before committing an --apply
 ```
+
+## Live verification
+
+Not yet performed on a real host: registration is proven by stub self-tests
+only (`tests/run.sh`). Goal, resume commands, pass/fail criteria and the
+results table: `references/live-verification.md`.
